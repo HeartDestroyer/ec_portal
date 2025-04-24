@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
-from aioredis import Redis
+from redis.asyncio import Redis
 from typing import Optional
 # Модели и схемы
 from core.models.user import User
@@ -21,7 +21,7 @@ class AuthenticationService:
         db: AsyncSession,
         redis: Redis,
         jwt_handler: JWTHandler,
-        email_manager: Optional[EmailManager] = None # EmailManager опционален
+        email_manager: Optional[EmailManager] = None
     ):
         self.db = db
         self.redis = redis
@@ -36,7 +36,7 @@ class AuthenticationService:
         :return: Пользователь или None
         """
         query = select(User).where(
-            or_(User.username == username_or_email, User.email == username_or_email)
+            or_(User.login == username_or_email, User.email == username_or_email)
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -48,7 +48,7 @@ class AuthenticationService:
         :param user_data: Данные пользователя
         :return: Пользователь
         """
-        existing_user = await self.get_user_by_username_or_email(user_data.username)
+        existing_user = await self.get_user_by_username_or_email(user_data.login)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

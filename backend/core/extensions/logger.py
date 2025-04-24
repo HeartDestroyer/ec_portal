@@ -1,10 +1,11 @@
-# backend/core/logger.py
+# backend/core/extensions/logger.py
 
 import logging
 import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 import json
+import collections.abc
 from datetime import datetime
 from typing import Any, Dict
 from core.config.config import settings
@@ -43,13 +44,22 @@ class CustomJsonFormatter(logging.Formatter):
         # Добавляем дополнительные атрибуты из record.__dict__
         for key, value in record.__dict__.items():
             if key not in self.default_keys and not key.startswith('_'):
-                log_object[key] = value
+                if isinstance(value, (str, int, float, bool, type(None))) or \
+                    isinstance(value, collections.abc.Sequence) or \
+                    isinstance(value, collections.abc.Mapping):
+                    log_object[key] = value
+                else:
+                    try:
+                        log_object[key] = str(value)
+                    except Exception:
+                        log_object[key] = f"<{type(value).__name__} object (unserializable)>"
 
         # Добавляем информацию об исключении, если оно есть
         if record.exc_info:
+            exc_type, exc_value, exc_traceback = record.exc_info
             log_object['exception'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
+                'type': exc_type.__name__ if exc_type else None,
+                'message': str(exc_value), # Явно преобразуем сообщение в строку
                 'traceback': self.formatException(record.exc_info)
             }
 

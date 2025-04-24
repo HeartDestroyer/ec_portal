@@ -1,23 +1,24 @@
 # backend/core/security/csrf.py
 
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import Request, HTTPException, status
 from typing import Optional, Callable
 import secrets
 import hmac
 import hashlib
 import time
 from functools import wraps
-from core.config.config import settings, get_settings
+from core.config.config import BaseSettingsClass, settings
 
 # Класс для защиты от CSRF атак
 class CSRFProtection:
     """
     Класс для защиты от CSRF атак
     """
-    def __init__(self):
+    def __init__(self, settings: BaseSettingsClass):
         self.settings = settings
         self.secret = settings.CSRF_SECRET.encode()
-        self.header_name = "X-CSRF-Token"
+        self.header_name = settings.CSRF_HEADER_NAME
+        self.max_age_seconds = settings.CSRF_TOKEN_EXPIRE_MINUTES * 60
 
     # Генерация CSRF токена с временной меткой
     def generate_token(self) -> str:
@@ -33,17 +34,19 @@ class CSRFProtection:
         return token
 
     # Проверка CSRF токена
-    def verify_token(self, token: str, max_age: int = 3600) -> bool:
+    def verify_token(self, token: str) -> bool:
         """
         Проверка CSRF токена
         :param token: CSRF токен
-        :param max_age: Максимальный возраст токена в секундах
         :return: True если токен валиден иначе False
         """
+        if not token:
+            return False
         try:
-            random_part, timestamp, signature = token.split('.')
+            random_part, timestamp_str, signature = token.split('.')
+            timestamp = int(timestamp_str)
             random_bytes = bytes.fromhex(random_part)
-            message = random_bytes + timestamp.encode()
+            message = random_bytes + timestamp_str.encode()
             expected_signature = hmac.new(self.secret, message, hashlib.sha256).hexdigest()
 
             # Проверка подписи
@@ -51,12 +54,12 @@ class CSRFProtection:
                 return False
 
             # Проверка времени жизни токена
-            token_age = int(time.time()) - int(timestamp)
-            if token_age > max_age:
+            token_age = int(time.time()) - timestamp
+            if token_age > self.max_age_seconds:
                 return False
 
             return True
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError, IndexError):
             return False
         
     # Декоратор для CSRF защиты с гибкими настройками
@@ -105,32 +108,26 @@ class CSRFProtection:
             return wrapper
         return decorator
 
+csrf_handler = CSRFProtection(settings)
+
 # Зависимость для проверки CSRF токена в заголовке
 async def csrf_verify_header(
     request: Request,
-    settings: Settings = Depends(get_settings)
 ):
     """
     Проверяет CSRF токен в заголовке для методов, изменяющих состояние
     :param request: Request объект
-    :param settings: Настройки приложения
     """
     csrf_protect_methods = {"POST", "PUT", "DELETE", "PATCH"}
     if request.method not in csrf_protect_methods:
         return # Пропускаем для безопасных методов
 
-    token_from_header = request.headers.get("X-CSRF-Token")
+    token_from_header = request.headers.get(csrf_handler.header_name)
 
     # Упрощенная проверка: просто требуем наличие заголовка
-    if not token_from_header:
-         raise HTTPException(
-             status_code=status.HTTP_403_FORBIDDEN,
-             detail="Отсутствует токен CSRF в заголовке"
-         )
-    csrf_handler = CSRFProtection(settings)
     if not csrf_handler.verify_token(token_from_header):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Неверный токен CSRF"
+            detail="Отсутствует или неверный токен CSRF в заголовке"
         )
 

@@ -2,7 +2,6 @@
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from core.security.csrf import verify_csrf_token
 
 class SecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

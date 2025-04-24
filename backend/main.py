@@ -3,27 +3,19 @@ from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
-from datetime import datetime
-import logging.config
 from typing import Callable
 import time
-import asyncio
-from prometheus_client import Counter, Histogram
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # Конфигурация и расширения
 from core.config.config import settings
-from core.extensions.database import engine, SessionLocal
+from core.extensions.database import engine
 from core.extensions.redis import redis_client
-from core.extensions.logger import Logger, logger
+from core.extensions.logger import logger
 from core.models.base import Base
 from core.middleware.rate_limiter import RateLimitMiddleware
 from core.middleware.security import SecurityMiddleware
 from core.middleware.metrics import PrometheusMiddleware
-
-# Метрики
-REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP requests')
-REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'HTTP request latency')
 
 # Wrapper для асинхронных итераторов 
 class AsyncIteratorWrapper:
@@ -54,8 +46,6 @@ class TimingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         response = await call_next(request)
         duration = time.time() - start_time
-        
-        REQUEST_LATENCY.observe(duration)
         response.headers["X-Process-Time"] = str(duration)
         return response
 
@@ -85,7 +75,6 @@ async def lifespan(app: FastAPI):
         logger.error(f"Ошибка при запуске приложения: {err}", exc_info=True)
         raise
     finally:
-        # Очистка ресурсов
         logger.info("Закрытие приложения...")
         await cleanup_services()
         await redis_client.close_redis()
@@ -111,6 +100,7 @@ def create_application() -> FastAPI:
     """
     Создание экземпляра FastAPI
     """
+    # Настройка FastAPI
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.PROJECT_VERSION,
@@ -137,10 +127,7 @@ def create_application() -> FastAPI:
     app.add_middleware(PrometheusMiddleware)
     app.add_middleware(TimingMiddleware)
 
-    # Регистрация обработчиков ошибок
     register_exception_handlers(app)
-
-    # Регистрация роутеров
     register_routers(app)
 
     return app
@@ -153,7 +140,7 @@ def register_exception_handlers(app: FastAPI):
     # Обработчик для HTTPException
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        logger.warning(f"HTTP Exception: {exc.status_code} - {exc.detail}")
+        logger.warning(f"HTTP-исключение: {exc.status_code} - {exc.detail}")
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail},
@@ -163,7 +150,7 @@ def register_exception_handlers(app: FastAPI):
     # Обработчик для всех остальных исключений
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+        logger.error(f"Необработанное исключение: {str(exc)}", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "Внутренняя ошибка сервера"},
@@ -174,10 +161,8 @@ def register_routers(app: FastAPI):
     """
     Регистрация роутеров
     """
-    # Роутеры
     from api.v1.auth.routes import auth_router
 
-    # Регистрация роутеров
     app.include_router(auth_router, prefix=settings.API_PREFIX)
 
 app = create_application()

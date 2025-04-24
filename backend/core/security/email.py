@@ -6,10 +6,10 @@ from pydantic import EmailStr
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from pathlib import Path
-import jwt
+from jose import jwt, JWTError
 from jinja2 import Environment, FileSystemLoader
 from core.config.config import settings
-import logging
+from core.extensions.logger import logger
 
 
 class EmailManager:
@@ -34,7 +34,6 @@ class EmailManager:
         )
         
         self.fastmail = FastMail(self.conf)
-        # Инициализация Jinja2 для шаблонов
         self.jinja_env = Environment(
             loader=FileSystemLoader(str(self.conf.TEMPLATE_FOLDER)),
             autoescape=True
@@ -47,7 +46,6 @@ class EmailManager:
         template_name: str,
         template_data: Dict[str, Any],
         cc: List[EmailStr] = None,
-        attachments: List[Dict] = None
     ) -> bool:
         """
         Базовый метод для отправки email с использованием шаблона
@@ -57,7 +55,6 @@ class EmailManager:
         :param template_name: Имя файла шаблона
         :param template_data: Данные для шаблона
         :param cc: Список адресов для копии
-        :param attachments: Список вложений
         :return: bool: True если отправка успешна, False в случае ошибки
         """
         try:
@@ -76,14 +73,14 @@ class EmailManager:
 
             # Отправляем email
             await self.fastmail.send_message(message, template_name=template_name)
-            logger.info(f"Email sent successfully to {email_to}")
+            logger.info(f"Письмо успешно отправлено {email_to}")
             return True
 
-        except ConnectionErrors as e:
-            logger.error(f"Failed to send email to {email_to}: {str(e)}")
+        except ConnectionErrors as err:
+            logger.error(f"Не удалось отправить письмо {email_to}: {err}")
             return False
-        except Exception as e:
-            logger.error(f"Unexpected error sending email to {email_to}: {str(e)}")
+        except Exception as err:
+            logger.error(f"Непредвиденная ошибка при отправке письма {email_to}: {err}")
             return False
 
     def _create_token(self, data: Dict[str, Any], expires_delta: timedelta) -> str:
@@ -122,10 +119,10 @@ class EmailManager:
                 return None
             return payload
         except jwt.ExpiredSignatureError:
-            logger.warning(f"Expired {token_type} token")
+            logger.warning(f"Истек срок действия {token_type} токена")
             return None
-        except jwt.JWTError as e:
-            logger.error(f"Invalid {token_type} token: {str(e)}")
+        except JWTError as err:
+            logger.error(f"Недействительный {token_type} токен: {str(err)}")
             return None
 
     # Отправляет email для подтверждения адреса

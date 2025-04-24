@@ -1,20 +1,22 @@
+# backend/core/security/password.py
+
 from passlib.context import CryptContext
 import re
 from datetime import datetime, timedelta
 import random
 import string
-
+from core.config.config import settings
 # Класс для работы с паролями
 class PasswordManager:
     def __init__(self):
         self.pwd_context = CryptContext(
             schemes=["bcrypt"],
             deprecated="auto",
-            bcrypt__rounds=12  # Увеличиваем количество раундов для большей безопасности
+            bcrypt__rounds=settings.BCRYPT_ROUNDS
         )
-        self.min_length = 8
-        self.max_failed_attempts = 5
-        self.lockout_duration = timedelta(minutes=15)
+        self.min_length = settings.MIN_LENGTH
+        self.max_failed_attempts = settings.MAX_FAILED_ATTEMPTS
+        self.lockout_duration = timedelta(minutes=settings.LOCKOUT_DURATION)
 
     # Хеширование пароля с использованием bcrypt
     def hash_password(self, password: str) -> str:

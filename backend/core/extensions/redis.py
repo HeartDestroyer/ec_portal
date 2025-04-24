@@ -1,9 +1,10 @@
 # backend/core/extensions/redis.py
 
-import aioredis
-from aioredis import Redis
+import redis.asyncio as redis
+from redis.asyncio import Redis
 from typing import Optional
 from core.config.config import settings
+from core.extensions.logger import logger
 
 # Управление Redis
 class RedisClient:
@@ -18,23 +19,18 @@ class RedisClient:
         """
         Инициализирует пул соединений Redis
         """
-        if self._redis is None:
-            redis_url = settings.REDIS_URL
-            if not redis_url:
-                 # Собираем URL, если он не задан напрямую
-                 protocol = "rediss" if settings.REDIS_SSL else "redis"
-                 password = f":{settings.REDIS_PASSWORD}@" if settings.REDIS_PASSWORD else ""
-                 redis_url = f"{protocol}://{password}{settings.REDIS_HOST}:{settings.REDIS_PORT}/{settings.REDIS_DB}"
-
-            self._redis = await aioredis.from_url(
-                redis_url,
+        if self._redis is None:            
+            self._redis = await redis.from_url(
+                settings.REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True # Автоматически декодировать ответы в строки
             )
             try:
                 await self._redis.ping()
+                logger.info("Redis client инициализирован")
             except Exception:
-                self._redis = None # Сбрасываем, если соединение неудачное
+                self._redis = None
+                logger.error("Redis client не инициализирован")
 
     # Закрытие соединения с Redis
     async def close_redis(self) -> None:
@@ -43,7 +39,6 @@ class RedisClient:
         """
         if self._redis:
             await self._redis.close()
-            await self._redis.connection_pool.disconnect() # Убедимся, что пул закрыт
             self._redis = None
 
     # Получение активного клиента Redis
@@ -52,12 +47,10 @@ class RedisClient:
         Возвращает активный клиент Redis
         """
         if self._redis is None:
-            # В идеале, здесь лучше выбросить исключение или логгировать ошибку,
-            # т.к. клиент должен быть инициализирован при старте приложения.
-            print("Внимание: Клиент Redis был доступен до инициализации")
+            logger.warning("Внимание: Клиент Redis был доступен до инициализации")
         return self._redis
 
-    # Методы-обертки для удобства (опционально)
+    # Методы-обертки для удобства
     async def set(self, key: str, value: str, expire_seconds: Optional[int] = None) -> Optional[bool]:
         """
         Устанавливает значение в Redis
@@ -88,5 +81,5 @@ redis_client = RedisClient()
 async def get_redis() -> Optional[Redis]:
     client = redis_client.get_client()
     if client is None:
-         raise RuntimeError("Клиент Redis не инициализирован")
+        raise RuntimeError("Клиент Redis не инициализирован")
     return client

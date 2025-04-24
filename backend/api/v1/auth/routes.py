@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter, Depends, Response, Request, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from aioredis import Redis
+from redis.asyncio import Redis
+from typing import Dict, Any, Optional
 
 # Схемы
 from .schemas import (
@@ -14,15 +15,14 @@ from .schemas import (
 from .services import AuthenticationService
 # Зависимости
 from api.v1.dependencies import (
-    get_db, get_redis, get_settings, Settings, get_current_active_user,
-    csrf_verify_header # Если используем CSRF
+    get_db, get_redis, get_current_active_user, settings, get_current_user_payload
 )
 from core.models.user import User
 from core.security.jwt import JWTHandler
 from core.security.csrf import CSRFProtection
-from core.security.email import EmailManager
+from core.security.email import email_manager
 
-auth_router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+auth_router = APIRouter(prefix="/api/v1/auth", tags=["Аутентификация и авторизация"])
 
 # Регистрация пользователя
 @auth_router.post(
@@ -34,8 +34,7 @@ auth_router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 async def register_user_endpoint(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    settings: Settings = Depends(get_settings)
+    redis: Redis = Depends(get_redis)
 ):
     """
     Регистрирует нового пользователя в системе
@@ -65,8 +64,7 @@ async def login_for_access_token(
     response: Response, # Для установки куки
     credentials: UserLogin = Depends(), # Используем Depends для данных формы
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    settings: Settings = Depends(get_settings)
+    redis: Redis = Depends(get_redis)
 ):
     """
     Аутентифицирует пользователя по имени/email и паролю
@@ -101,8 +99,7 @@ async def refresh_tokens_endpoint(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    settings: Settings = Depends(get_settings)
+    redis: Redis = Depends(get_redis)
 ):
     """
     бновляет access и refresh токены, используя refresh токен из HttpOnly cookie
@@ -149,7 +146,6 @@ async def refresh_tokens_endpoint(
 async def logout_endpoint(
     response: Response,
     redis: Redis = Depends(get_redis),
-    settings: Settings = Depends(get_settings),
     # Пытаемся получить payload, но не выбрасываем ошибку, если токен невалиден
     payload: Optional[Dict[str, Any]] = Depends(get_current_user_payload)
 ):
@@ -200,8 +196,7 @@ async def read_users_me(
 )
 async def request_password_reset_endpoint(
     data: RequestPasswordReset,
-    db: AsyncSession = Depends(get_db),
-    settings: Settings = Depends(get_settings)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Отправляет ссылку для сброса пароля на указанный email, если пользователь существует.
@@ -224,8 +219,7 @@ async def request_password_reset_endpoint(
 async def reset_password_endpoint(
     data: ResetPassword,
     db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    settings: Settings = Depends(get_settings)
+    redis: Redis = Depends(get_redis)
 ):
     """
     Устанавливает новый пароль, используя токен из email
@@ -303,11 +297,11 @@ async def resend_verification_email_endpoint(
 
 # Для получения CSRF токена (если используется Double Submit Cookie)
 @auth_router.get(
-    "/csrf-token",
+    "/csrf",
     response_model=CSRFTokenResponse,
     summary="Получение CSRF токена"
 )
-async def get_csrf_token(response: Response, settings: Settings = Depends(get_settings)):
+async def get_csrf_token(response: Response):
     """
     Генерирует CSRF токен и устанавливает его в куки (не HttpOnly)
     Фронтенд должен будет прочитать эту куку и добавить значение в заголовок X-CSRF-Token
@@ -322,6 +316,3 @@ async def get_csrf_token(response: Response, settings: Settings = Depends(get_se
         httponly=False # Важно: False, чтобы JS мог прочитать
     )
     return CSRFTokenResponse(csrf_token=csrf_token)
-
-# Подключаем роутер авторизации к основному приложению в main.py
-app.include_router(auth_router)

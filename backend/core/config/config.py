@@ -1,9 +1,9 @@
 # core/config/config.py
 
 from pydantic_settings import BaseSettings
-from typing import List, Union, Optional
+from typing import List, Optional
 from pathlib import Path
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, ValidationInfo
 import os
 
 # Базовые настройки приложения
@@ -14,9 +14,10 @@ class BaseSettingsClass(BaseSettings):
     # Основные настройки
     PROJECT_NAME: str = "ЭЦ Портал"
     PROJECT_VERSION: str = "1.2.0"
-    API_PREFIX: str = "/api/v1"
+    API_PREFIX: str = ""
     SECRET_KEY: str = Field(..., env="SECRET_KEY", description="Секретный ключ приложения")
     DEBUG: bool = False
+    ENVIRONMENT: str = Field(..., env="ENVIRONMENT", description="Окружение")
 
     # Сервер
     SERVER_HOST: str = "0.0.0.0"
@@ -26,10 +27,11 @@ class BaseSettingsClass(BaseSettings):
     TIMEOUT_KEEP_ALIVE: int = 5
 
     # Настройки JWT аутентификации
-    JWT_SECRET_KEY: str = Field(..., env="SECRET_KEY", description="Секретный ключ для JWT")
+    JWT_SECRET_KEY: str = Field(..., env="JWT_SECRET_KEY", description="Секретный ключ для JWT")
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    REFRESH_TOKEN_COOKIE: str = "refresh_token_cookie"
 
     # Настройки CORS
     CORS_ALLOW_CREDENTIALS: bool = True
@@ -46,10 +48,6 @@ class BaseSettingsClass(BaseSettings):
     }
 
     # Настройки Redis
-    REDIS_HOST: str = Field(..., env="REDIS_HOST", description="Хост Redis")
-    REDIS_PORT: int = Field(6379, env="REDIS_PORT", description="Порт Redis")
-    REDIS_DB: int = 0 
-    REDIS_PASSWORD: Optional[str] = Field(None, env="REDIS_PASSWORD", description="Пароль Redis")
     REDIS_SSL: bool = True
     REDIS_URL: Optional[str] = Field(None, env="REDIS_URL", description="URL Redis")
 
@@ -67,16 +65,22 @@ class BaseSettingsClass(BaseSettings):
     SESSION_LIFETIME: int = 86400
     CSRF_SECRET: str = Field(..., env="CSRF_SECRET", description="Секретный ключ для CSRF")
     CSRF_TOKEN_EXPIRE_MINUTES: int = 30
-    
+    CSRF_HEADER_NAME: str = "X-CSRF-Token"
+    BCRYPT_ROUNDS: int = 12
+    MIN_LENGTH: int = 8
+    MAX_FAILED_ATTEMPTS: int = 5
+    LOCKOUT_DURATION: int = 15
+
+
     # Настройки ограничителя запросов
-    LIMITER_STORAGE_URI: str = Field(..., env="REDIS_URL")
+    LIMITER_STORAGE_URI: str = Field(..., env="LIMITER_STORAGE_URI")
     RATELIMIT_DEFAULT: str = "200 per day;50 per hour"
     TIME_RATE_LIMITER: int = 60
     SIZE_RATE_LIMITER: int = 300
 
     # Настройки кэширования
     CACHE_TYPE: str = 'RedisCache'
-    CACHE_REDIS_URL: str = Field(..., env="REDIS_URL")
+    CACHE_REDIS_URL: str = Field(..., env="CACHE_REDIS_URL")
     CACHE_DEFAULT_TIMEOUT: int = 1800
 
     # Логирование
@@ -90,23 +94,39 @@ class BaseSettingsClass(BaseSettings):
     ENABLE_METRICS: bool = True
     METRICS_PORT: int = 9000
 
+    class Config:
+        env_file = ".env" 
+        env_file_encoding = "utf-8"
+        extra = 'ignore'
+
 # Конфигурация для разработки
 class DevelopmentSettings(BaseSettingsClass):
     """
     Конфигурация для разработки
     """
-    DEBUG = True
-    SQLALCHEMY_ECHO = True
+    DEBUG: bool = True
+    SQLALCHEMY_ECHO: bool = True
     CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+
+    # Проверка обязательных переменных окружения
+    @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')
+    @classmethod
+    def check_required_vars(cls, error, info: ValidationInfo):
+        """
+        Проверка обязательных переменных окружения
+        """
+        if error is None or error == "":
+            raise ValueError(f"Обязательная переменная окружения отсутствует: {info.field_name}")
+        return error
 
 # Конфигурация для продакшена
 class ProductionSettings(BaseSettingsClass):
     """
     Конфигурация для продакшена
     """
-    DEBUG = False
-    SESSION_COOKIE_SECURE = True
-    REMEMBER_COOKIE_SECURE = True
+    DEBUG: bool = False
+    SESSION_COOKIE_SECURE: bool = True
+    REMEMBER_COOKIE_SECURE: bool = True
     CORS_ORIGINS: List[str] = [
         "https://hr.exp-cr.ru",
         "https://preza.exp-cr.ru",
@@ -114,13 +134,14 @@ class ProductionSettings(BaseSettingsClass):
     ]
     
     # Проверка обязательных переменных окружения
-    @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_HOST", "CSRF_SECRET", pre=True)
-    def check_required_vars(cls, error, field: Field):
+    @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')
+    @classmethod
+    def check_required_vars(cls, error, info: ValidationInfo):
         """
         Проверка обязательных переменных окружения
         """
-        if not error:
-            raise ValueError(f"Обязательная переменная окружения отсутствует: {field.name}")
+        if error is None or error == "":
+            raise ValueError(f"Обязательная переменная окружения отсутствует: {info.field_name}")
         return error
 
 # Выбор конфигурации в зависимости от окружения
@@ -128,11 +149,12 @@ def get_settings() -> BaseSettingsClass:
     """
     Получение конфигурации в зависимости от окружения
     """
-    env = os.getenv("FASTAPI_ENV", "development").lower()
+    env = os.getenv("ENVIRONMENT", "development").lower()
     settings_map = {
         "development": DevelopmentSettings,
         "production": ProductionSettings,
     }
+
     return settings_map.get(env, DevelopmentSettings)()
 
 settings = get_settings()
