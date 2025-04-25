@@ -10,7 +10,7 @@ from jose import jwt, JWTError
 from jinja2 import Environment, FileSystemLoader
 from core.config.config import settings
 from core.extensions.logger import logger
-
+import uuid
 
 class EmailManager:
     """
@@ -26,18 +26,24 @@ class EmailManager:
             MAIL_FROM=settings.MAIL_DEFAULT_SENDER,
             MAIL_PORT=settings.MAIL_PORT,
             MAIL_SERVER=settings.MAIL_SERVER,
-            MAIL_SSL_TLS=settings.MAIL_SSL,
             MAIL_STARTTLS=settings.MAIL_TLS,
+            MAIL_SSL_TLS=settings.MAIL_SSL,
             MAIL_FROM_NAME=settings.PROJECT_NAME,
-            USE_CREDENTIALS=True,
-            TEMPLATE_FOLDER=Path(__file__).parent.parent.parent / 'templates' / 'email'
+            USE_CREDENTIALS=True
         )
+
+        self.verify_email_template = 'verify_email'
+        self.reset_password_template = 'reset_password'
+        self.welcome_email_template = 'welcome'
+        self.notification_email_template = 'notification'
         
-        self.fastmail = FastMail(self.conf)
+        template_folder = Path(__file__).parent.parent.parent / 'templates' / 'email'
         self.jinja_env = Environment(
-            loader=FileSystemLoader(str(self.conf.TEMPLATE_FOLDER)),
+            loader=FileSystemLoader(str(template_folder)),
             autoescape=True
         )
+
+        self.fastmail = FastMail(self.conf)
 
     async def _send_email(
         self,
@@ -50,12 +56,12 @@ class EmailManager:
         """
         Базовый метод для отправки email с использованием шаблона
         
-        :param email_to: Email получателя
+        :param email_to: `email` получателя
         :param subject: Тема письма
         :param template_name: Имя файла шаблона
         :param template_data: Данные для шаблона
         :param cc: Список адресов для копии
-        :return: bool: True если отправка успешна, False в случае ошибки
+        :return: bool: `True` если отправка успешна, `False` в случае ошибки
         """
         try:
             # Получаем шаблон и рендерим его
@@ -67,7 +73,7 @@ class EmailManager:
                 subject=subject,
                 recipients=[email_to] if isinstance(email_to, str) else email_to,
                 body=html_content,
-                cc=cc,
+                cc=cc if cc else [],
                 subtype="html"
             )
 
@@ -83,10 +89,10 @@ class EmailManager:
             logger.error(f"Непредвиденная ошибка при отправке письма {email_to}: {err}")
             return False
 
+    # Создает подписанный `JWT` токен для `email` верификации/сброса пароля
     def _create_token(self, data: Dict[str, Any], expires_delta: timedelta) -> str:
         """
-        Создает подписанный JWT токен для email верификации/сброса пароля
-        
+        Создает подписанный `JWT` токен для `email` верификации/сброса пароля
         :param data: Данные для токена
         :param expires_delta: Срок действия токена
         :return: str: Подписанный JWT токен
@@ -96,23 +102,24 @@ class EmailManager:
         to_encode.update({"exp": expire})
         return jwt.encode(
             to_encode,
-            settings.SECRET_KEY,
+            settings.SECRET_KEY_SIGNED_URL,
             algorithm=settings.JWT_ALGORITHM
         )
+
 
     # Проверяет JWT токен для email верификации/сброса пароля
     def verify_token(self, token: str, token_type: str) -> Optional[Dict[str, Any]]:
         """
-        Проверяет JWT токен для email верификации/сброса пароля
+        Проверяет `JWT` токен для `email` верификации/сброса пароля
         
         :param token: JWT токен для проверки
-        :param token_type: Тип токена ('email_verification' или 'password_reset')
-        :return: Optional[Dict]: Данные из токена или None если токен невалиден
+        :param token_type: Тип токена (`email_verification` или `password_reset`)
+        :return: Optional[Dict]: Данные из токена или `None` если токен невалиден
         """
         try:
             payload = jwt.decode(
                 token,
-                settings.SECRET_KEY,
+                settings.SECRET_KEY_SIGNED_URL,
                 algorithms=[settings.JWT_ALGORITHM]
             )
             if payload.get("type") != token_type:
@@ -122,15 +129,16 @@ class EmailManager:
             logger.warning(f"Истек срок действия {token_type} токена")
             return None
         except JWTError as err:
-            logger.error(f"Недействительный {token_type} токен: {str(err)}")
+            logger.error(f"Недействительный {token_type} токен: {err}")
             return None
 
+
     # Отправляет email для подтверждения адреса
-    async def send_verification_email(self, email: EmailStr, user_id: int) -> bool:
+    async def send_verification_email(self, email: EmailStr, user_id: uuid.UUID) -> bool:
         """
-        Отправляет email для подтверждения адреса
+        Отправляет `email` для подтверждения адреса
         
-        :param email: Email пользователя
+        :param email: `email` пользователя
         :param user_id: ID пользователя
         :return: bool: True если отправка успешна
         """
@@ -141,13 +149,13 @@ class EmailManager:
         )
 
         # Формируем URL для верификации
-        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+        verification_url = f"{settings.FRONTEND_URL}/api/v1/auth/verify-email?token={token}"
 
         # Отправляем email
         return await self._send_email(
             email_to=email,
             subject="Подтверждение email адреса",
-            template_name="verify_email",
+            template_name=self.verify_email_template,
             template_data={
                 "verification_url": verification_url,
                 "project_name": settings.PROJECT_NAME,
@@ -155,12 +163,13 @@ class EmailManager:
             }
         )
 
+
     # Отправляет email для сброса пароля
-    async def send_password_reset_email(self, email: EmailStr, user_id: int) -> bool:
+    async def send_password_reset_email(self, email: EmailStr, user_id: uuid.UUID) -> bool:
         """
-        Отправляет email для сброса пароля
+        Отправляет `email` для сброса пароля
         
-        :param email: Email пользователя
+        :param email: `email` пользователя
         :param user_id: ID пользователя
         :return: bool: True если отправка успешна
         """
@@ -171,13 +180,13 @@ class EmailManager:
         )
 
         # Формируем URL для сброса пароля
-        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        reset_url = f"{settings.FRONTEND_URL}/api/v1/auth/reset-password?token={token}"
 
         # Отправляем email
         return await self._send_email(
             email_to=email,
             subject="Сброс пароля",
-            template_name="reset_password",
+            template_name=self.reset_password_template,
             template_data={
                 "reset_url": reset_url,
                 "project_name": settings.PROJECT_NAME,
@@ -190,14 +199,14 @@ class EmailManager:
         """
         Отправляет приветственное письмо новому пользователю
         
-        :param email: Email пользователя
-        :param username: Имя пользователя
+        :param email: `email` пользователя
+        :param login: `login` пользователя
         :return: bool: True если отправка успешна
         """
         return await self._send_email(
             email_to=email,
             subject=f"Добро пожаловать в {settings.PROJECT_NAME}!",
-            template_name="welcome",
+            template_name=self.welcome_email_template,
             template_data={
                 "username": username,
                 "project_name": settings.PROJECT_NAME,
@@ -216,7 +225,7 @@ class EmailManager:
         """
         Отправляет уведомление пользователю
 
-        :param email: Email получателя
+        :param email: `email` получателя
         :param subject: Тема письма
         :param message: Текст сообщения
         :param template_data: Дополнительные данные для шаблона
@@ -232,9 +241,8 @@ class EmailManager:
         return await self._send_email(
             email_to=email,
             subject=subject,
-            template_name="notification",
+            template_name=self.notification_email_template,
             template_data=data
         )
 
-# Создаем глобальный экземпляр для использования в приложении
 email_manager = EmailManager()

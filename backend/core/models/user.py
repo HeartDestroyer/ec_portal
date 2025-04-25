@@ -2,11 +2,13 @@
 
 import enum
 import uuid
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Enum as SQLEnum, ForeignKey, Text
+from datetime import datetime, date
+from sqlalchemy import String, Boolean, DateTime, Date, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from core.models.base import Base
+from core.models.department import Department
+from core.models.group import Group
 
 # Роли пользователей
 class Role(enum.Enum):
@@ -54,46 +56,45 @@ class City(enum.Enum):
 class User(Base):
     __tablename__ = 'users'
 
-    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
-    login = Column(String(80), unique=True, nullable=False, index=True)
-    email = Column(String(256), unique=True, nullable=False, index=True)
-    name = Column(String(128), nullable=False, index=True)
-    hashed_password = Column(String(256), nullable=False)
-    phone = Column(String(25), nullable=True, index=True)
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
+    login: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(256), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(25), nullable=True, default=None, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    department_id = Column(Integer, ForeignKey('departments.id'), nullable=True, doc="ID департамента")
-    group_id = Column(Integer, ForeignKey('groups.id'), nullable=True, doc="ID группы")
+    department_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('departments.id'), nullable=True, doc="ID департамента")
+    group_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('groups.id'), nullable=True, doc="ID группы")
 
-    work_position = Column(String(128), nullable=True, doc="Должность")
-    date_employment = Column(Date, nullable=True, doc="Дата трудоустройства")
-    city = Column(SQLEnum(City), nullable=True, index=True, doc="Город")
-    date_birthday = Column(Date, nullable=True, doc="Дата рождения")
-    company = Column(SQLEnum(Company), nullable=True, index=True, doc="Компания")
-    bitrix_id = Column(Integer, nullable=True, index=True, doc="ID в Битриксе")
-    qr_code_vcard = Column(String(512), nullable=True, doc="QR-код vCard")
-    user_email = Column(String(128), nullable=True, doc="Рабочая почта")
-    telegram_id = Column(String(128), nullable=True, index=True, doc="Телеграм ID")
-    gender = Column(SQLEnum(Gender), nullable=True, index=True, doc="Пол")
-    photo_url = Column(String(512), nullable=True, doc="URL фотографии пользователя")
-    photo_url_small = Column(String(512), nullable=True, doc="URL уменьшенной фотографии пользователя")
-    bio = Column(Text, nullable=True, doc="Биография или описание пользователя")
+    work_position: Mapped[str | None] = mapped_column(String(128), nullable=True, doc="Должность")
+    date_employment: Mapped[date | None] = mapped_column(Date, nullable=True, doc="Дата трудоустройства")
+    city: Mapped[City | None] = mapped_column(Enum(City), nullable=True, index=True, doc="Город")
+    date_birthday: Mapped[date | None] = mapped_column(Date, nullable=True, doc="Дата рождения")
+    company: Mapped[Company | None] = mapped_column(Enum(Company), nullable=True, index=True, doc="Компания")
+    bitrix_id: Mapped[int | None] = mapped_column(nullable=True, index=True, doc="ID в Битриксе")
+    qr_code_vcard: Mapped[str | None] = mapped_column(String(512), nullable=True, doc="QR-код vCard")
+    user_email: Mapped[str | None] = mapped_column(String(128), nullable=True, doc="Рабочая почта")
+    telegram_id: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True, doc="Телеграм ID")
+    gender: Mapped[Gender | None] = mapped_column(Enum(Gender), nullable=True, index=True, doc="Пол")
+    photo_url: Mapped[str | None] = mapped_column(String(512), nullable=True, doc="URL фотографии пользователя")
+    photo_url_small: Mapped[str | None] = mapped_column(String(512), nullable=True, doc="URL уменьшенной фотографии пользователя")
+    bio: Mapped[str | None] = mapped_column(Text, nullable=True, doc="Биография или описание пользователя")
 
-    role = Column(SQLEnum(Role), default=Role.GUEST, nullable=False, index=True, doc="Роль")
-    additional_role = Column(SQLEnum(AdditionalRole), nullable=True, index=True, doc="Дополнительная роль")
+    role: Mapped[Role] = mapped_column(Enum(Role), default=Role.GUEST, nullable=False, index=True, doc="Роль")
+    additional_role: Mapped[AdditionalRole | None] = mapped_column(Enum(AdditionalRole), nullable=True, index=True, doc="Дополнительная роль")
 
-    # Поля для безопасности и аудита
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    last_login = Column(DateTime)
-    failed_login_attempts = Column(Integer, default=0)
-    locked_until = Column(DateTime)
-    last_password_change = Column(DateTime, nullable=True, doc="Дата последнего изменения пароля")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime)
+    failed_login_attempts: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime)
+    last_password_change: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, doc="Дата последнего изменения пароля")
 
     # Связи
-    department = relationship("Department", back_populates="users")
-    group = relationship("Group", back_populates="users")
+    department: Mapped["Department | None"] = relationship("Department", back_populates="users")
+    group: Mapped["Group | None"] = relationship("Group", back_populates="users")
     
     # Методы сериализации
     def to_dict(self):
@@ -108,8 +109,8 @@ class User(Base):
             "phone": self.phone,
             "is_active": self.is_active,
             "is_verified": self.is_verified,
-            "department_id": self.department_id,
-            "group_id": self.group_id,
+            "department_id": str(self.department_id) if self.department_id else None,
+            "group_id": str(self.group_id) if self.group_id else None,
             "work_position": self.work_position,
             "date_employment": self.date_employment.isoformat() if self.date_employment else None,
             "city": self.city.value if self.city else None,

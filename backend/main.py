@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from typing import Callable
 import time
@@ -57,15 +58,11 @@ async def lifespan(app: FastAPI):
     """
     try:
         logger.info("Запуск приложения...")
-        await redis_client.init_redis()
 
-        # Инициализация базы данных
-        async with engine.begin() as conn:
-            logger.info("Инициализация таблиц базы данных...")
-            await conn.run_sync(Base.metadata.create_all)
-            logger.info("Таблицы базы данных инициализированы")
+        if not settings.REDIS_URL:
+            logger.error("REDIS_URL не настроен в переменных окружения")
+            raise ValueError("REDIS_URL не настроен")
 
-        # Инициализация сервисов
         await initialize_services()
 
         logger.info("Приложение запущено")
@@ -77,23 +74,55 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Закрытие приложения...")
         await cleanup_services()
-        await redis_client.close_redis()
-        await engine.dispose()
+        
         logger.info("Приложение завершено")
 
-# Инициализация дополнительных сервисов
+# Инициализация сервисов
 async def initialize_services():
     """
-    Инициализация дополнительных сервисов
+    Инициализация сервисов
     """
-    pass
+    # Инициализация Redis
+    logger.info("Инициализация Redis...")
+    await redis_client.init_redis()
+    
+    # Проверяем, что Redis действительно инициализирован
+    if not redis_client.get_client():
+        logger.error("Redis не удалось инициализировать")
+        raise RuntimeError("Redis не удалось инициализировать")
+    
+    logger.info("Redis инициализирован успешно")
+
+    # Инициализация базы данных
+    try:
+        logger.info("Инициализация базы данных...")
+        async with engine.begin() as conn:
+            logger.info("Инициализация таблиц базы данных...")
+            await conn.run_sync(Base.metadata.create_all)
+            logger.info("Таблицы базы данных инициализированы")
+    except Exception as err:
+        logger.error(f"Ошибка при инициализации базы данных: {err}", exc_info=True)
+        raise
 
 # Очистка ресурсов при завершении работы
 async def cleanup_services():
     """
     Очистка ресурсов при завершении работы
     """
-    pass
+    try:
+        if redis_client:
+            logger.info("Закрытие соединения с Redis...")
+            await redis_client.close_redis()
+            logger.info("Соединение с Redis закрыто")
+    except Exception as err:
+        logger.error(f"Ошибка при закрытии Redis: {err}", exc_info=True)
+    
+    try:
+        logger.info("Закрытие соединения с базой данных...")
+        await engine.dispose()
+        logger.info("Соединение с базой данных закрыто")
+    except Exception as err:
+        logger.error(f"Ошибка при закрытии соединения с базой данных: {err}", exc_info=True)
 
 # Создание экземпляра FastAPI
 def create_application() -> FastAPI:
@@ -137,13 +166,29 @@ def register_exception_handlers(app: FastAPI):
     """
     Регистрация обработчиков ошибок
     """
+    # Обработчик для валидации данных
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        errors = []
+        for error in exc.errors():
+            message = error["msg"]
+            if message.startswith("Value error, "):
+                message = message[13:]
+            errors.append({
+                "message": message
+            })
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"errors": errors}
+        )
+
     # Обработчик для HTTPException
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         logger.warning(f"HTTP-исключение: {exc.status_code} - {exc.detail}")
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": exc.detail},
+            content={"message": exc.detail},
             headers=exc.headers,
         )
 
@@ -153,7 +198,7 @@ def register_exception_handlers(app: FastAPI):
         logger.error(f"Необработанное исключение: {str(exc)}", exc_info=True)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Внутренняя ошибка сервера"},
+            content={"message": "Внутренняя ошибка сервера"},
         )
 
 # Регистрация роутеров
@@ -162,7 +207,6 @@ def register_routers(app: FastAPI):
     Регистрация роутеров
     """
     from api.v1.auth.routes import auth_router
-
     app.include_router(auth_router, prefix=settings.API_PREFIX)
 
 app = create_application()

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Response, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
 from typing import Dict, Any, Optional
+from core.extensions.logger import logger
 
 # Схемы
 from .schemas import (
@@ -37,23 +38,22 @@ async def register_user_endpoint(
     redis: Redis = Depends(get_redis)
 ):
     """
-    Регистрирует нового пользователя в системе
-    Требует уникальные `username` и `email`
-    Валидирует пароль на сложность
-    Отправляет письмо для подтверждения email
+    Регистрирует нового пользователя в системе.
+    Требует уникальные `login` и `email`.
+    Валидирует `password` на сложность.
+    Отправляет письмо для подтверждения `email`.
     """
     jwt_handler = JWTHandler(settings)
     auth_service = AuthenticationService(db, redis, jwt_handler, email_manager)
     try:
-        new_user = await auth_service.register_user(user_data)
+        new_user = await auth_service.register(user_data)
         return new_user
     except HTTPException as err:
-        raise err # Пробрасываем ошибки валидации и существования пользователя
+        raise err
     except Exception as err:
-         # Логгирование непредвиденной ошибки
-         print(f"Неожиданная ошибка при регистрации: {err}")
-         raise HTTPException(status_code=500, detail="Ошибка регистрации")
-    
+        logger.error(f"Неожиданная ошибка при регистрации пользователя: {err}")
+        raise HTTPException(status_code=500, detail="Ошибка регистрации пользователя")
+
 # Вход в систему
 @auth_router.post(
     "/login", 
@@ -62,32 +62,32 @@ async def register_user_endpoint(
 )
 async def login_for_access_token(
     response: Response, # Для установки куки
-    credentials: UserLogin = Depends(), # Используем Depends для данных формы
+    credentials: UserLogin = Depends(),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
     """
-    Аутентифицирует пользователя по имени/email и паролю
-    Возвращает `access_token`
-    Устанавливает `refresh_token` в HttpOnly cookie
-    Реализована защита от брутфорса
+    Аутентифицирует пользователя по `login`/ `email` и `password`.
+    Возвращает `access_token`.
+    Устанавливает `refresh_token` в HttpOnly cookie.
+    Реализована защита от брутфорса.
     """
     jwt_handler = JWTHandler(settings)
-    auth_service = AuthenticationService(db, redis, jwt_handler)
+    auth_service = AuthenticationService(db, redis, jwt_handler, email_manager)
 
     try:
         user, access_token, refresh_token = await auth_service.authenticate_user(
-            credentials.username_or_email,
+            credentials.login_or_email,
             credentials.password
         )
         # Установка refresh токена в куки
         await jwt_handler.set_refresh_token_cookie(response, refresh_token)
-        return TokenResponse(access_token=access_token)
+        return TokenResponse(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
     except HTTPException as err:
         raise err
     except Exception as err:
-         print(f"Неожиданная ошибка при входе: {err}")
-         raise HTTPException(status_code=500, detail="Ошибка входа")
+        logger.error(f"Неожиданная ошибка при входе: {err}")
+        raise HTTPException(status_code=500, detail="Ошибка входа на портал")
 
 # Обновление токенов
 @auth_router.post(
@@ -102,7 +102,7 @@ async def refresh_tokens_endpoint(
     redis: Redis = Depends(get_redis)
 ):
     """
-    бновляет access и refresh токены, используя refresh токен из HttpOnly cookie
+    Обновляет access и refresh токены, используя refresh токен из HttpOnly cookie
     Возвращает `access_token`
     Устанавливает новый `refresh_token` в HttpOnly cookie
     """
@@ -120,7 +120,7 @@ async def refresh_tokens_endpoint(
         new_access_token, new_refresh_token = await auth_service.refresh_access_token(refresh_token)
         # Установка нового refresh токена в куки
         await jwt_handler.set_refresh_token_cookie(response, new_refresh_token)
-        return TokenResponse(access_token=new_access_token)
+        return TokenResponse(access_token=new_access_token, refresh_token=new_refresh_token, token_type="bearer")
     except HTTPException as err:
         # Если токен невалиден или отозван, удаляем куку
         if err.status_code == status.HTTP_401_UNAUTHORIZED:
@@ -251,22 +251,22 @@ async def verify_email_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Подтверждает email пользователя, используя токен из ссылки
+    Подтверждает `email` пользователя, используя `token` из ссылки
     Активирует аккаунт пользователя
     """
     if not email_manager:
-         raise HTTPException(status_code=503, detail="Сервис email временно недоступен")
+        raise HTTPException(status_code=503, detail="Сервис email временно недоступен")
 
     # Используем None для Redis и JWT
     auth_service = AuthenticationService(db, None, None, email_manager)
     try:
         await auth_service.verify_email_token(token)
-        return MessageResponse(message="email успешно подтвержден")
+        return MessageResponse(message="Почта успешно подтверждена")
     except HTTPException as err:
-        raise err
+        raise HTTPException(status_code=500, detail="Ошибка подтверждения почты")
     except Exception as err:
-         print(f"Непредвиденная ошибка при подтверждении email: {err}")
-         raise HTTPException(status_code=500, detail="Ошибка подтверждения email")
+        logger.error(f"Непредвиденная ошибка при подтверждении email: {err}")
+        raise HTTPException(status_code=500, detail="Ошибка подтверждения почты")
 
 # Отправка повторной верификации email
 @auth_router.post(
@@ -295,7 +295,7 @@ async def resend_verification_email_endpoint(
          print(f"Непредвиденная ошибка при повторной отправке письма для подтверждения email: {err}")
          raise HTTPException(status_code=500, detail="Ошибка отправки письма")
 
-# Для получения CSRF токена (если используется Double Submit Cookie)
+# Для получения CSRF токена
 @auth_router.get(
     "/csrf",
     response_model=CSRFTokenResponse,
@@ -303,8 +303,8 @@ async def resend_verification_email_endpoint(
 )
 async def get_csrf_token(response: Response):
     """
-    Генерирует CSRF токен и устанавливает его в куки (не HttpOnly)
-    Фронтенд должен будет прочитать эту куку и добавить значение в заголовок X-CSRF-Token
+    Генерирует `CSRF токен` и устанавливает его в куки (не HttpOnly)
+    Фронтенд должен будет прочитать эту куку и добавить значение в заголовок `X-CSRF-Token`
     """
     csrf_handler = CSRFProtection(settings)
     csrf_token = csrf_handler.generate_token()

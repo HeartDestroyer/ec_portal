@@ -12,7 +12,7 @@ class UserCreate(BaseModel):
     login: str = Field(..., min_length=3, max_length=80, description="Имя пользователя (уникальное)")
     email: EmailStr = Field(..., description="Email пользователя (уникальный)")
     name: str = Field(..., max_length=128, description="Полное имя")
-    password: str = Field(..., min_length=8, description="Пароль")
+    password: str = Field(..., description="Пароль")
     phone: Optional[str] = Field(None, max_length=25, description="Телефон")
     
     @field_validator('password')
@@ -22,16 +22,17 @@ class UserCreate(BaseModel):
         """
         is_valid, errors = password_manager.validate_password(v)
         if not is_valid:
-            raise ValueError(", ".join(errors))
+            for error in errors:
+                raise ValueError(error)
         return v
 
-    @field_validator('username')
-    def validate_username(cls, v):
+    @field_validator('login')
+    def validate_login(cls, v):
         """
         Валидация имени пользователя
         """
         if not v.isalnum():
-            raise ValueError('Username должен содержать только буквы и цифры')
+            raise ValueError('Логин должен содержать только буквы и цифры')
         return v
 
 # Схема для аутентификации пользователя
@@ -64,11 +65,14 @@ class ResetPassword(BaseModel):
         """
         is_valid, errors = password_manager.validate_password(v)
         if not is_valid:
-            raise ValueError(", ".join(errors))
+            # Изменяем формат вывода ошибки
+            error_message = "Требования к паролю не выполнены: " + "; ".join(errors)
+            raise ValueError(error_message)
         return v
 
+
 # --- Схемы для ответов ---
-# Схема для ответа на запрос сброса пароля
+# Схема для ответа на аутентификацию пользователя / сброс пароля
 class TokenResponse(BaseModel):
     """
     Схема для ответа на запрос сброса пароля
@@ -82,19 +86,11 @@ class UserBase(BaseModel):
     """
     Схема для базовой информации о пользователе
     """
-    id: int
+    id: uuid.UUID
     login: str
     email: EmailStr
     name: str
     phone: Optional[str] = None
-
-
-    role: Role
-    additional_role: Optional[AdditionalRole] = None
-    work_position: Optional[str] = None
-    company: Optional[Company] = None
-    city: Optional[City] = None
-    gender: Optional[Gender] = None
 
     is_active: bool
     is_verified: bool
@@ -103,12 +99,14 @@ class UserBase(BaseModel):
         from_attributes = True
 
 # Схема для публичной информации о пользователе
-class UserPublicProfile(UserBase):
+class UserPublicProfile(BaseModel):
     """
     Схема для публичной информации о пользователе
     """
-    # Исключаем чувствительные поля
-    pass
+    login: str
+    email: EmailStr
+    name: str
+    phone: Optional[str] = None
 
 # Схема для приватной информации о пользователе
 class UserPrivateProfile(UserBase):

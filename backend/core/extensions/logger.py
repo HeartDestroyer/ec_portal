@@ -32,7 +32,7 @@ class CustomJsonFormatter(logging.Formatter):
         log_object: Dict[str, Any] = {
             'timestamp': datetime.fromtimestamp(record.created).isoformat(),
             'level': record.levelname,
-            'message': record.getMessage(),
+            'message': str(record.getMessage()),  # Явно преобразуем в строку
             'module': record.module,
             'function': record.funcName,
             'path': record.pathname,
@@ -44,26 +44,37 @@ class CustomJsonFormatter(logging.Formatter):
         # Добавляем дополнительные атрибуты из record.__dict__
         for key, value in record.__dict__.items():
             if key not in self.default_keys and not key.startswith('_'):
-                if isinstance(value, (str, int, float, bool, type(None))) or \
-                    isinstance(value, collections.abc.Sequence) or \
-                    isinstance(value, collections.abc.Mapping):
-                    log_object[key] = value
-                else:
-                    try:
+                try:
+                    if isinstance(value, (str, int, float, bool, type(None))):
+                        log_object[key] = value
+                    elif isinstance(value, (list, tuple, set)):
+                        log_object[key] = [str(item) for item in value]
+                    elif isinstance(value, dict):
+                        log_object[key] = {str(k): str(v) for k, v in value.items()}
+                    else:
                         log_object[key] = str(value)
-                    except Exception:
-                        log_object[key] = f"<{type(value).__name__} object (unserializable)>"
+                except Exception:
+                    log_object[key] = f"<{type(value).__name__} обьект (несериализуемый)>"
 
         # Добавляем информацию об исключении, если оно есть
         if record.exc_info:
             exc_type, exc_value, exc_traceback = record.exc_info
             log_object['exception'] = {
                 'type': exc_type.__name__ if exc_type else None,
-                'message': str(exc_value), # Явно преобразуем сообщение в строку
+                'message': str(exc_value) if exc_value else None,
                 'traceback': self.formatException(record.exc_info)
             }
 
-        return json.dumps(log_object, ensure_ascii=False)
+        try:
+            return json.dumps(log_object, ensure_ascii=False)
+        except Exception as e:
+            # Если не удалось сериализовать, возвращаем базовую информацию
+            return json.dumps({
+                'timestamp': log_object['timestamp'],
+                'level': log_object['level'],
+                'message': str(e),
+                'error': 'Не удалось сериализовать логи'
+            }, ensure_ascii=False)
 
 class Logger:
     """

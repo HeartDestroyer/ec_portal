@@ -1,4 +1,5 @@
 # core/middleware/security.py
+# Добавляет заголовки безопасности к ответам
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

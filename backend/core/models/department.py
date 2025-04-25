@@ -1,14 +1,13 @@
 # backend/core/models/department.py
 
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-from core.models.base import Base
-from typing import List, TYPE_CHECKING
 import uuid
+from datetime import datetime
+from typing import List, TYPE_CHECKING
+from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+from core.models.base import Base
 
-
-# Предотвращение циклического импорта для type hinting
 if TYPE_CHECKING:
     from .user import User
 
@@ -19,15 +18,18 @@ class Department(Base):
     """
     __tablename__ = 'departments'
 
-    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
-    name = Column(String(128), nullable=False, unique=True, doc="Название департамента")
-    description = Column(String(512), nullable=True, doc="Описание департамента")
-    parent_id = Column(UUID(as_uuid=True), ForeignKey('departments.id'), nullable=True, doc="ID родительского департамента")
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, doc="Название департамента")
+    description: Mapped[str | None] = mapped_column(String(512), nullable=True, doc="Описание департамента")
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('departments.id'), nullable=True, doc="ID родительского департамента")
 
     # Связи
-    users: List["User"] = relationship("User", back_populates="department")
-    parent = relationship("Department", back_populates="children")
-    children = relationship("Department", back_populates="parent")
+    users: Mapped[List["User"]] = relationship("User", back_populates="department")
+    parent: Mapped["Department | None"] = relationship("Department", back_populates="children", remote_side=[id])
+    children: Mapped[List["Department"]] = relationship("Department", back_populates="parent")
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Сериализация модели департамента в словарь
     def to_dict(self):

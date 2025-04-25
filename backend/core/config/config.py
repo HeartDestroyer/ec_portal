@@ -20,7 +20,7 @@ class BaseSettingsClass(BaseSettings):
     ENVIRONMENT: str = Field(..., env="ENVIRONMENT", description="Окружение")
 
     # Сервер
-    SERVER_HOST: str = "0.0.0.0"
+    SERVER_HOST: str = "127.0.0.1"
     SERVER_PORT: int = 8000
     WORKERS_COUNT: int = 4
     LIMIT_CONCURRENCY: int = 100
@@ -48,20 +48,23 @@ class BaseSettingsClass(BaseSettings):
     }
 
     # Настройки Redis
-    REDIS_SSL: bool = True
-    REDIS_URL: Optional[str] = Field(None, env="REDIS_URL", description="URL Redis")
+    REDIS_SSL: bool = False
+    REDIS_URL: str = Field(..., env="REDIS_URL", description="URL Redis")
+    REDIS_MAX_CONNECTIONS: int = 50
+    REDIS_TIMEOUT: int = 15
 
     # Настройки почты
-    MAIL_USERNAME: Optional[str] = Field(None, env="MAIL_USERNAME")
-    MAIL_PASSWORD: Optional[str] = Field(None, env="MAIL_PASSWORD")
+    MAIL_USERNAME: str = Field(..., env="MAIL_USERNAME")
+    MAIL_PASSWORD: str = Field(..., env="MAIL_PASSWORD")
     MAIL_PORT: int = Field(465, env="MAIL_PORT")
-    MAIL_SERVER: str = Field("smtp.gmail.com", env="MAIL_SERVER")
-    MAIL_DEFAULT_SENDER: Optional[str] = Field(None, env="MAIL_DEFAULT_SENDER")
-    MAIL_TLS: bool = False
-    MAIL_SSL: bool = True
+    MAIL_SERVER: str = Field(..., env="MAIL_SERVER")
+    MAIL_DEFAULT_SENDER: str = Field(..., env="MAIL_DEFAULT_SENDER")
+    MAIL_TLS: bool = Field(False, env="MAIL_TLS")
+    MAIL_SSL: bool = Field(True, env="MAIL_SSL")
 
     # Настройки безопасности
     SECURITY_PASSWORD_SALT: str = Field(..., env="SECURITY_PASSWORD_SALT")
+    SECRET_KEY_SIGNED_URL: str = Field(..., env="SECRET_KEY_SIGNED_URL")
     SESSION_LIFETIME: int = 86400
     CSRF_SECRET: str = Field(..., env="CSRF_SECRET", description="Секретный ключ для CSRF")
     CSRF_TOKEN_EXPIRE_MINUTES: int = 30
@@ -107,6 +110,7 @@ class DevelopmentSettings(BaseSettingsClass):
     DEBUG: bool = True
     SQLALCHEMY_ECHO: bool = True
     CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    FRONTEND_URL: str = "http://127.0.0.1:8000"
 
     # Проверка обязательных переменных окружения
     @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')
@@ -132,6 +136,7 @@ class ProductionSettings(BaseSettingsClass):
         "https://preza.exp-cr.ru",
         "https://ecgamingstudio.com",
     ]
+    FRONTEND_URL: str = "https://hr.exp-cr.ru"
     
     # Проверка обязательных переменных окружения
     @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')

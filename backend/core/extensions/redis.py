@@ -13,24 +13,51 @@ class RedisClient:
     """
     def __init__(self):
         self._redis: Optional[Redis] = None
+        self.redis_url = settings.REDIS_URL
+        self.redis_ssl = settings.REDIS_SSL
+        self.redis_max_connections = settings.REDIS_MAX_CONNECTIONS
+        self.redis_timeout = settings.REDIS_TIMEOUT
 
     # Инициализация асинхронного клиента Redis
     async def init_redis(self) -> None:
         """
         Инициализирует пул соединений Redis
         """
+        if not self.redis_url:
+            logger.error("Redis URL не указан в настройках")
+            return
+
         if self._redis is None:            
-            self._redis = await redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True # Автоматически декодировать ответы в строки
-            )
             try:
+                # Базовые параметры подключения
+                connection_params = {
+                    "encoding": "utf-8",
+                    "decode_responses": True,
+                    "socket_timeout": self.redis_timeout,
+                    "socket_connect_timeout": self.redis_timeout,
+                    "retry_on_timeout": True,
+                    "max_connections": self.redis_max_connections
+                }
+                
+                # Добавляем SSL параметры если нужно
+                if self.redis_ssl:
+                    connection_params.update({
+                        "ssl_cert_reqs": None,
+                        "ssl": self.redis_ssl
+                    })
+                
+                self._redis = await redis.from_url(
+                    self.redis_url,
+                    **connection_params
+                )
                 await self._redis.ping()
-                logger.info("Redis client инициализирован")
-            except Exception:
+                logger.info("Redis client успешно инициализирован")
+            except redis.ConnectionError as err:
+                logger.error(f"Ошибка подключения к Redis: {err}")
                 self._redis = None
-                logger.error("Redis client не инициализирован")
+            except Exception as err:
+                logger.error(f"Неожиданная ошибка при инициализации Redis: {err}")
+                self._redis = None
 
     # Закрытие соединения с Redis
     async def close_redis(self) -> None:

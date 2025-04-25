@@ -1,27 +1,35 @@
 # backend/api/auth/services.py
 
 from datetime import datetime
+import uuid
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from redis.asyncio import Redis
 from typing import Optional
+
 # Модели и схемы
 from core.models.user import User
 from .schemas import UserCreate, ResetPassword
+from core.extensions.logger import logger
 
 # Утилиты безопасности
 from core.security.password import password_manager
 from core.security.jwt import JWTHandler
 from core.security.email import EmailManager
+from utils.functions import format_phone_number
 
+# Сервис для аутентификации пользователя
 class AuthenticationService:
+    """Сервис для аутентификации пользователя"""
+
+    # Инициализация
     def __init__(
         self,
         db: AsyncSession,
         redis: Redis,
         jwt_handler: JWTHandler,
-        email_manager: Optional[EmailManager] = None
+        email_manager: EmailManager
     ):
         self.db = db
         self.redis = redis
@@ -29,14 +37,14 @@ class AuthenticationService:
         self.email_manager = email_manager
 
     # Получение пользователя по имени или email
-    async def get_user_by_username_or_email(self, username_or_email: str) -> Optional[User]:
+    async def get_user_by_login_or_email(self, login_or_email: str) -> Optional[User]:
         """
-        Находит пользователя по имени или email.
-        :param username_or_email: Имя пользователя или email
+        Находит пользователя по `login` или `email` в таблице `users`
+        :param login_or_email: `login` или `email` пользователя
         :return: Пользователь или None
         """
         query = select(User).where(
-            or_(User.login == username_or_email, User.email == username_or_email)
+            or_(User.login == login_or_email, User.email == login_or_email)
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
@@ -44,17 +52,17 @@ class AuthenticationService:
     # Регистрация пользователя
     async def register(self, user_data: UserCreate) -> User:
         """
-        Регистрация нового пользователя
-        :param user_data: Данные пользователя
+        Регистрация нового пользователя в таблице `users`
+        :param user_data: Данные пользователя для регистрации
         :return: Пользователь
         """
-        existing_user = await self.get_user_by_username_or_email(user_data.login)
+        existing_user = await self.get_user_by_login_or_email(user_data.login)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Пользователь с таким логином уже существует"
             )
-        existing_user = await self.get_user_by_username_or_email(user_data.email)
+        existing_user = await self.get_user_by_login_or_email(user_data.email)
         if existing_user:
              raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -62,9 +70,11 @@ class AuthenticationService:
             )
 
         hashed_password = password_manager.hash_password(user_data.password)
-        # Создаем пользователя с данными из схемы
+        formatted_phone = format_phone_number(user_data.phone) if user_data.phone else None
+
         new_user = User(
-            **user_data.model_dump(exclude={"password"}), # Исключаем пароль
+            **user_data.model_dump(exclude={"password", 'phone'}),
+            phone=formatted_phone,
             hashed_password=hashed_password,
             is_active=False,
             is_verified=False
@@ -79,21 +89,20 @@ class AuthenticationService:
             try:
                 await self.email_manager.send_verification_email(new_user.email, new_user.id)
             except Exception as err:
-                # Логгирование ошибки отправки email
-                print(f"Ошибка в отправке письма для подтверждения {new_user.email}: {err}")
+                logger.error(f"Ошибка в отправке письма для подтверждения {new_user.email}: {err}")
 
         return new_user
 
     # Аутентификация пользователя
-    async def authenticate_user(self, username_or_email: str, password: str) -> tuple[User, str, str]:
+    async def authenticate_user(self, login_or_email: str, password: str) -> tuple[User, str, str]:
         """
         Аутентификация пользователя
-        :param username_or_email: Имя пользователя или email
-        :param password: Пароль пользователя
-        :return: Кортеж из пользователя, access токена и refresh токена
+        :param login_or_email: `login` или `email` пользователя
+        :param password: `password` пользователя
+        :return: Кортеж из пользователя, `access токена` и `refresh токена`
         """
         # Поиск пользователя
-        user = await self.get_user_by_username_or_email(username_or_email)
+        user = await self.get_user_by_login_or_email(login_or_email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -121,7 +130,7 @@ class AuthenticationService:
         if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Аккаунт неактивен"
+                detail="Аккаунт деактивирован"
             )
 
         # Сброс счетчика неудачных попыток и обновление last_login
@@ -135,7 +144,7 @@ class AuthenticationService:
             "sub": str(user.id),
             "email": user.email,
             "role": user.role.value,
-            "username": user.username
+            "login": user.login
         }
         access_token, refresh_token = await self.jwt_handler.create_tokens(user_payload, self.redis)
 
@@ -144,18 +153,12 @@ class AuthenticationService:
     # Обновление токенов
     async def refresh_access_token(self, refresh_token: str) -> tuple[str, str]:
         """
-        Обновляет access и refresh токены
+        Обновляет `access` и `refresh` токены
         :param refresh_token: Refresh токен
         :return: Кортеж из access токена и refresh токена
         """
         # Проверка refresh токена
         payload = await self.jwt_handler.verify_token(refresh_token, "refresh", self.redis)
-        user_id = int(payload["sub"])
-        
-        # Получаем пользователя из БД для проверки статуса
-        query = select(User).where(User.id == user_id)
-        result = await self.db.execute(query)
-        user = result.scalar_one_or_none()
 
         # Получение пользователя
         user_id = int(payload["sub"])
@@ -179,7 +182,7 @@ class AuthenticationService:
             "sub": str(user.id),
             "email": user.email,
             "role": user.role.value,
-            "username": user.username
+            "login": user.login
         }
         new_access_token, new_refresh_token = await self.jwt_handler.create_tokens(user_payload, self.redis)
 
@@ -192,25 +195,25 @@ class AuthenticationService:
         :param user: Пользователь
         """
         if not self.email_manager:
-             raise HTTPException(status_code=500, detail="Cервис Email не настроен")
+            raise HTTPException(status_code=500, detail="Cервис Email не настроен")
         if user.is_verified:
-             raise HTTPException(status_code=400, detail="email уже подтвержден")
+            raise HTTPException(status_code=400, detail="Почта уже подтверждена")
         await self.email_manager.send_verification_email(user.email, user.id)
 
     # Верификация email
     async def verify_email_token(self, token: str) -> User:
         """
-        Верификация email
+        Верификация `email` пользователя, в случае успеха верифицирует и активирует пользователя
         :param token: Токен для верификации
         :return: Пользователь
         """
         if not self.email_manager:
             raise HTTPException(status_code=500, detail="Сервис Email не настроен")
-        payload = self.email_manager.verify_email_token(token)
+        payload = self.email_manager.verify_token(token, "email_verification")
         if not payload:
             raise HTTPException(status_code=400, detail="Невалидный или просроченный токен")
 
-        user_id = int(payload["sub"])
+        user_id = uuid.UUID(payload["sub"])
         query = select(User).where(User.id == user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()
@@ -218,7 +221,7 @@ class AuthenticationService:
         if not user:
             raise HTTPException(status_code=404, detail="Пользователь не найден")
         if user.is_verified:
-             raise HTTPException(status_code=400, detail="Email уже подтвержден")
+            raise HTTPException(status_code=400, detail="Почта уже подтверждена")
 
         user.is_verified = True
         user.is_active = True # Активируем пользователя после подтверждения
@@ -234,18 +237,18 @@ class AuthenticationService:
         """
         if not self.email_manager:
              raise HTTPException(status_code=500, detail="Сервис Email не настроен")
-        user = await self.get_user_by_username_or_email(email)
+        user = await self.get_user_by_login_or_email(email)
         if user:
             # Всегда возвращаем успех, чтобы не раскрывать существование email
             try:
-                 await self.email_manager.send_reset_password_email(user.email, user.id)
+                await self.email_manager.send_password_reset_email(user.email, user.id)
             except Exception as err:
-                 print(f"Ошибка в отправке письма для сброса пароля {email}: {err}")
+                logger.error(f"Ошибка в отправке письма для сброса пароля {email}: {err}")
 
     # Сброс пароля
     async def reset_password_service(self, data: ResetPassword) -> None:
         """
-        Сброс пароля
+        Сброс `password` пользователя
         :param data: Данные для сброса пароля
         """
         if not self.email_manager:
@@ -254,7 +257,8 @@ class AuthenticationService:
         if not payload:
             raise HTTPException(status_code=400, detail="Невалидный или просроченный токен")
 
-        user_id = int(payload["sub"])
+        # Получение пользователя
+        user_id = uuid.UUID(payload["sub"])
         query = select(User).where(User.id == user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()

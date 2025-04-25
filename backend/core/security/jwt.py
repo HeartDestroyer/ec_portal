@@ -123,7 +123,7 @@ class JWTHandler:
                 
             if token_type == "access":
                 if stored_data != token:
-                     raise credentials_exception # Токен отозван или истек в Redis
+                    raise credentials_exception # Токен отозван или истек в Redis
             elif token_type == "refresh":
                 if stored_data is None or stored_data != token:
                     raise credentials_exception # Токен отозван или не совпадает
@@ -155,7 +155,7 @@ class JWTHandler:
     # Отзыв всех токенов пользователя
     async def revoke_tokens(self, user_id: str, redis: Redis) -> None:
         """
-        Отзыв всех токенов пользователя удалением из Redis
+        Отзыв всех `токенов` пользователя удалением из `Redis`
         :param user_id: ID пользователя
         :param redis: Redis клиент
         """

@@ -1,3 +1,4 @@
+# utils/functions.py
 # Модуль с вспомогательными функциями для работы с данными
 
 from dateutil import parser as date_parser
