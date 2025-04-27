@@ -204,7 +204,7 @@ class AuthenticationService:
     async def verify_email_token(self, token: str) -> User:
         """
         Верификация `email` пользователя, в случае успеха верифицирует и активирует пользователя
-        :param token: Токен для верификации
+        :param token: `Токен` для верификации
         :return: Пользователь
         """
         if not self.email_manager:

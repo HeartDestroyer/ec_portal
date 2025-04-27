@@ -1,0 +1,12 @@
+{
+    "name": "ЭЦ-Портал",
+    "short_name": "ЭЦ-Портал",
+    "description": "ЭЦ-портал — платформа для управления бизнес-процессами и обучения сотрудников",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
+    "lang": "ru"
+}
