@@ -15,11 +15,7 @@
 import { RoutePaths } from '@/types/routes.types';
 
 export const API_CONFIG = {
-    BASE_URL: process.env.BACKEND_URL,
-    TOKEN: {
-        ACCESS: 'access_token',
-        REFRESH: 'refresh_token'
-    },
+    BASE_URL: import.meta.env.VITE_BACKEND_URL,
     ENDPOINTS: {
         AUTH: {
             REGISTER: '/api/v1/auth/register',
@@ -33,7 +29,7 @@ export const API_CONFIG = {
             CSRF: '/api/v1/auth/csrf',
         },
         USER: {
-            INFO: '/api/v1/user/me',
+            INFO: '/api/v1/auth/me',
         },
     },
 } as const;
@@ -41,19 +37,18 @@ export const API_CONFIG = {
 export const APP_CONFIG = {
     NAME: import.meta.env.VITE_APP_NAME,
     VERSION: import.meta.env.VITE_APP_VERSION,
-    STORAGE_KEYS: {
-        USER: 'user'
-    },
     ROUTES: {
         PUBLIC: {
+            START: '/',
             LOGIN: '/login',
             REGISTER: '/register',
+            VERIFY_EMAIL: '/verify-email',
             PASSWORD_RECOVERY: '/password-recovery',
             RESET_PASSWORD: '/reset-password',
             NOT_FOUND: '/404',
         } as RoutePaths['PUBLIC'],
         PRIVATE: {
-            DASHBOARD: '/dashboard',
+            DASHBOARD: '/',
         } as RoutePaths['PRIVATE'],
     },
 } as const;
@@ -69,7 +64,14 @@ export const VALIDATION_CONFIG = {
         MAX_LENGTH: 20,
         PATTERN: /^[a-zA-Z0-9_]+$/,
     },
+    PHONE: {
+        PATTERN: /^(\+7|8)?[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}$/,
+    },
     EMAIL: {
         PATTERN: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    },
+    NAME: {
+        MIN_LENGTH: 5,
+        MAX_LENGTH: 100,
     },
 } as const;

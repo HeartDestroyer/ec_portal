@@ -4,11 +4,11 @@
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status, Response
+from fastapi import Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
-
+import uuid
 # Импортируем конфигурацию и Redis
 from core.config.config import BaseSettingsClass, settings, ProductionSettings
 from core.extensions.redis import get_redis
@@ -31,6 +31,7 @@ class JWTHandler:
         self.algorithm = settings.JWT_ALGORITHM
         self.secret_key = settings.JWT_SECRET_KEY
         self.refresh_cookie_name = settings.REFRESH_TOKEN_COOKIE
+        self.access_cookie_name = settings.ACCESS_TOKEN_COOKIE
 
     # Создание access токена
     async def create_access_token(self, data: Dict[str, Any], redis: Redis) -> str:
@@ -138,9 +139,9 @@ class JWTHandler:
     # Установка refresh токена в cookie
     async def set_refresh_token_cookie(self, response: Response, token: str) -> None:
         """
-        Установка refresh токена в HttpOnly cookie
+        Установка `refresh` токена в `HttpOnly cookie`
         :param response: Response объект
-        :param token: Refresh токен
+        :param token: `Refresh` токен
         """
         response.set_cookie(
             key=self.refresh_cookie_name,
@@ -149,7 +150,24 @@ class JWTHandler:
             secure=isinstance(self.settings, ProductionSettings) and self.settings.SESSION_COOKIE_SECURE,
             samesite="lax",
             max_age=int(self.refresh_token_expire.total_seconds()),
-            path=f"{self.settings.API_PREFIX}/auth"
+            path="/api",
+        )
+
+    # Установка access токена в cookie
+    async def set_access_token_cookie(self, response: Response, token: str) -> None:
+        """
+        Установка `access` токена в `HttpOnly cookie`
+        :param response: Response объект
+        :param token: `Access` токен
+        """
+        response.set_cookie(
+            key=self.access_cookie_name,
+            value=token,
+            httponly=True,
+            secure=isinstance(self.settings, ProductionSettings) and self.settings.SESSION_COOKIE_SECURE,
+            samesite="lax",
+            max_age=int(self.access_token_expire.total_seconds()),
+            path="/api",
         )
 
     # Отзыв всех токенов пользователя
@@ -166,7 +184,7 @@ jwt_handler = JWTHandler(settings)
 
 # Зависимость для получения текущего пользователя из токена
 async def get_current_user_payload(
-    token: str = Depends(oauth2_scheme),
+    request: Request,
     redis: Redis = Depends(get_redis)
 ) -> Dict[str, Any]:
     """
@@ -176,6 +194,10 @@ async def get_current_user_payload(
     :param redis: Redis клиент
     :return: Данные пользователя
     """
+    token = request.cookies.get(jwt_handler.access_cookie_name)
+    if not token:
+        raise HTTPException(status_code=401, detail="Нет access токена")
+    
     payload = await jwt_handler.verify_token(token, "access", redis)
     return payload
 
@@ -198,7 +220,7 @@ async def get_current_active_user(
         raise HTTPException(status_code=401, detail="Пользователь не найден")
 
     try:
-        user_id = int(user_id_str)
+        user_id = uuid.UUID(user_id_str)
     except ValueError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверный токен: некорректный ID пользователя")
 

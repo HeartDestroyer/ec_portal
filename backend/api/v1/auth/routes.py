@@ -1,6 +1,6 @@
 # backend/api/auth/routes.py
 
-from fastapi import APIRouter, Depends, Response, Request, HTTPException, status, Body
+from fastapi import APIRouter, Depends, Response, Request, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
 from typing import Dict, Any, Optional
@@ -8,7 +8,7 @@ from core.extensions.logger import logger
 
 # Схемы
 from .schemas import (
-    UserCreate, UserLogin, TokenResponse, UserPublicProfile,
+    UserCreate, UserLogin, UserPublicProfile,
     UserPrivateProfile, MessageResponse, RequestPasswordReset, ResetPassword,
     CSRFTokenResponse
 )
@@ -28,7 +28,6 @@ auth_router = APIRouter(prefix="/api/v1/auth", tags=["Аутентификаци
 # Регистрация пользователя
 @auth_router.post(
     "/register", 
-    response_model=UserPublicProfile, 
     status_code=status.HTTP_201_CREATED,
     summary="Регистрация нового пользователя"
 )
@@ -46,8 +45,9 @@ async def register_user_endpoint(
     jwt_handler = JWTHandler(settings)
     auth_service = AuthenticationService(db, redis, jwt_handler, email_manager)
     try:
-        new_user = await auth_service.register(user_data)
-        return new_user
+        new_user, message = await auth_service.register(user_data)
+        return {"user": new_user.to_public_dict(), "message": message}
+    
     except HTTPException as err:
         raise err
     except Exception as err:
@@ -57,19 +57,17 @@ async def register_user_endpoint(
 # Вход в систему
 @auth_router.post(
     "/login", 
-    response_model=TokenResponse, 
     summary="Аутентификация пользователя"
 )
 async def login_for_access_token(
-    response: Response, # Для установки куки
-    credentials: UserLogin = Depends(),
+    response: Response,
+    credentials: UserLogin,
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
     """
     Аутентифицирует пользователя по `login`/ `email` и `password`.
-    Возвращает `access_token`.
-    Устанавливает `refresh_token` в HttpOnly cookie.
+    Устанавливает `refresh_token` и `access_token` в HttpOnly cookie.
     Реализована защита от брутфорса.
     """
     jwt_handler = JWTHandler(settings)
@@ -80,9 +78,12 @@ async def login_for_access_token(
             credentials.login_or_email,
             credentials.password
         )
-        # Установка refresh токена в куки
+        # Установка refresh и access токенов в куки
         await jwt_handler.set_refresh_token_cookie(response, refresh_token)
-        return TokenResponse(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
+        await jwt_handler.set_access_token_cookie(response, access_token)
+
+        return {"message": "Успешный вход"}
+    
     except HTTPException as err:
         raise err
     except Exception as err:
@@ -92,7 +93,6 @@ async def login_for_access_token(
 # Обновление токенов
 @auth_router.post(
     "/refresh", 
-    response_model=TokenResponse,
     summary="Обновление токенов"
 )
 async def refresh_tokens_endpoint(
@@ -102,9 +102,8 @@ async def refresh_tokens_endpoint(
     redis: Redis = Depends(get_redis)
 ):
     """
-    Обновляет access и refresh токены, используя refresh токен из HttpOnly cookie
-    Возвращает `access_token`
-    Устанавливает новый `refresh_token` в HttpOnly cookie
+    Обновляет `access` и `refresh` токены, используя `refresh` токен из HttpOnly cookie
+    Устанавливает новый `refresh_token` и `access_token` в HttpOnly cookie
     """
     refresh_token = request.cookies.get(JWTHandler(settings).refresh_cookie_name)
     if not refresh_token:
@@ -114,19 +113,22 @@ async def refresh_tokens_endpoint(
         )
     
     jwt_handler = JWTHandler(settings)
-    auth_service = AuthenticationService(db, redis, jwt_handler)
+    auth_service = AuthenticationService(db, redis, jwt_handler, email_manager)
 
     try:
         new_access_token, new_refresh_token = await auth_service.refresh_access_token(refresh_token)
-        # Установка нового refresh токена в куки
+
+        # Установка нового refresh и access токенов в куки
         await jwt_handler.set_refresh_token_cookie(response, new_refresh_token)
-        return TokenResponse(access_token=new_access_token, refresh_token=new_refresh_token, token_type="bearer")
+        await jwt_handler.set_access_token_cookie(response, new_access_token)
+
+        return {"message": "Токены обновлены"}
+    
     except HTTPException as err:
-        # Если токен невалиден или отозван, удаляем куку
         if err.status_code == status.HTTP_401_UNAUTHORIZED:
              response.delete_cookie(
                 key=jwt_handler.refresh_cookie_name,
-                path="/api/v1/auth",
+                path="/api",
                 secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
                 httponly=True,
                 samesite="lax"
@@ -134,8 +136,8 @@ async def refresh_tokens_endpoint(
         raise err
     
     except Exception as err:
-         print(f"Неожиданная ошибка при обновлении токена: {err}")
-         raise HTTPException(status_code=500, detail="Ошибка обновления токена")
+        logger.error(f"Неожиданная ошибка при обновлении токена: {err}")
+        raise HTTPException(status_code=500, detail="Ошибка обновления токена")
 
 # Выход из системы
 @auth_router.post(
@@ -152,24 +154,30 @@ async def logout_endpoint(
     """
     Выход из системы
     Отзывает токены в Redis
-    Удаляет refresh токен из куки
+    Удаляет `refresh` и `access` токены из куки
     """
     jwt_handler = JWTHandler(settings)
     user_id = payload.get("sub") if payload else None
     
     if user_id:
         await jwt_handler.revoke_tokens(user_id, redis)
-        print(f"Токены аннулированы для пользователя {user_id}")
+        logger.info(f"Токены аннулированы для пользователя {user_id}")
 
     # Удаление куки в любом случае
     response.delete_cookie(
         key=jwt_handler.refresh_cookie_name,
-        path="/api/v1/auth",
+        path="/api",
         secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
         httponly=True,
         samesite="lax"
     )
-    print("Refresh токен удален")
+    response.delete_cookie(
+        key=jwt_handler.access_cookie_name,
+        path="/api",
+        secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
+        httponly=True,
+        samesite="lax"
+    )
     return MessageResponse(message="Успешный выход")
 
 # Получение текущего пользователя
@@ -237,17 +245,17 @@ async def reset_password_endpoint(
     except HTTPException as err:
         raise err
     except Exception as err:
-        print(f"Непредвиденная ошибка при сбросе пароля: {err}")
+        logger.error(f"Непредвиденная ошибка при сбросе пароля: {err}")
         raise HTTPException(status_code=500, detail="Ошибка сброса пароля")
 
 # Верификация email
-@auth_router.post(
+@auth_router.get(
     "/verify-email",
     response_model=MessageResponse,
     summary="Подтверждение email"
 )
 async def verify_email_endpoint(
-    token: str = Body(..., embed=True), # Получаем токен из тела запроса
+    token: str = Query(..., description="Токен подтверждения email"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -292,8 +300,8 @@ async def resend_verification_email_endpoint(
     except HTTPException as err:
         raise err
     except Exception as err:
-         print(f"Непредвиденная ошибка при повторной отправке письма для подтверждения email: {err}")
-         raise HTTPException(status_code=500, detail="Ошибка отправки письма")
+        logger.error(f"Непредвиденная ошибка при повторной отправке письма для подтверждения email: {err}")
+        raise HTTPException(status_code=500, detail="Ошибка отправки письма")
 
 # Для получения CSRF токена
 @auth_router.get(
@@ -308,11 +316,5 @@ async def get_csrf_token(response: Response):
     """
     csrf_handler = CSRFProtection(settings)
     csrf_token = csrf_handler.generate_token()
-    response.set_cookie(
-        key="csrf_token", # Имя куки должно совпадать с тем, что проверяется
-        value=csrf_token,
-        secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
-        samesite="lax",
-        httponly=False # Важно: False, чтобы JS мог прочитать
-    )
+    await csrf_handler.set_csrf_token_cookie(response, csrf_token)
     return CSRFTokenResponse(csrf_token=csrf_token)

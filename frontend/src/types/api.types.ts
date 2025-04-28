@@ -1,3 +1,9 @@
+
+/**
+ * Типы для работы с API
+ * Содержит типы для работы с API
+ */
+
 export interface ApiResponse<T> {
     data: T;
     status: number;

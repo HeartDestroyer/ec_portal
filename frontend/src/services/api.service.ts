@@ -1,14 +1,15 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { API_CONFIG } from '@/config/app.config';
+/**
+ * Сервис для работы с API
+ * Конструктор создаёт экземпляр axios с настройками по умолчанию
+ * Интерсепторы для обработки ошибок и обновления токенов
+ * Реализованы методы для работы с API (GET, POST, PUT, DELETE, PATCH)
+ */
 
-interface CustomAxiosRequestConfig extends AxiosRequestConfig {
-    _retry?: boolean;
-}
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { API_CONFIG, APP_CONFIG } from '@/config/app.config';
 
 class ApiService {
     private instance: AxiosInstance;
-    private isRefreshing: boolean = false;
-    private refreshSubscribers: ((token: string) => void)[] = [];
 
     constructor() {
         this.instance = axios.create({
@@ -16,87 +17,52 @@ class ApiService {
             headers: {
                 'Content-Type': 'application/json',
             },
-            withCredentials: true // Включаем поддержку куки
+            withCredentials: true
         });
-
-        this.instance.interceptors.request.use(
-            (config) => {
-                const token = localStorage.getItem(API_CONFIG.TOKEN.ACCESS);
-                if (token) {
-                    config.headers.Authorization = `Bearer ${token}`;
-                }
-                return config;
-            },
-            (error) => Promise.reject(error)
-        );
 
         this.instance.interceptors.response.use(
             (response) => response,
             async (error: AxiosError) => {
-                const originalRequest = error.config as CustomAxiosRequestConfig;
+                const originalRequest = error.config as any;
                 
-                if (error.response?.status === 401 && !originalRequest?._retry) {
-                    if (this.isRefreshing) {
-                        return new Promise((resolve) => {
-                            this.refreshSubscribers.push((token: string) => {
-                                if (originalRequest?.headers) {
-                                    originalRequest.headers.Authorization = `Bearer ${token}`;
-                                }
-                                resolve(this.instance(originalRequest!));
-                            });
-                        });
-                    }
-
-                    originalRequest!._retry = true;
-                    this.isRefreshing = true;
-
+                const isAuthRequest =
+                    originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.LOGIN) ||
+                    originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
+                
+                if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
+                    originalRequest._retry = true;
                     try {
-                        const response = await this.refreshToken();
-                        const { accessToken } = response.data;
-                        
-                        localStorage.setItem(API_CONFIG.TOKEN.ACCESS, accessToken);
-                        
-                        if (originalRequest?.headers) {
-                            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-                        }
-                        
-                        this.refreshSubscribers.forEach((callback) => callback(accessToken));
-                        this.refreshSubscribers = [];
-                        
-                        return this.instance(originalRequest!);
+                        // Обновления токенов, если access токен истек, но refresh токен ещё жив
+                        await this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
+                        return this.instance(originalRequest);
                     } catch (refreshError) {
-                        localStorage.removeItem(API_CONFIG.TOKEN.ACCESS);
-                        localStorage.removeItem(API_CONFIG.TOKEN.REFRESH);
-                        window.location.href = '/login';
-                        return Promise.reject(refreshError);
-                    } finally {
-                        this.isRefreshing = false;
+                        // window.location.href = APP_CONFIG.ROUTES.PUBLIC.LOGIN;
                     }
                 }
-
                 return Promise.reject(error);
             }
         );
     }
-
-    private async refreshToken() {
-        return this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
-    }
-
-    public async get<T>(url: string, config?: CustomAxiosRequestConfig): Promise<AxiosResponse<T>> {
+                
+    // Методы для работы с API
+    public async get<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
         return this.instance.get<T>(url, config);
     }
 
-    public async post<T>(url: string, data?: any, config?: CustomAxiosRequestConfig): Promise<AxiosResponse<T>> {
+    public async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
         return this.instance.post<T>(url, data, config);
     }
 
-    public async put<T>(url: string, data?: any, config?: CustomAxiosRequestConfig): Promise<AxiosResponse<T>> {
+    public async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
         return this.instance.put<T>(url, data, config);
     }
 
-    public async delete<T>(url: string, config?: CustomAxiosRequestConfig): Promise<AxiosResponse<T>> {
+    public async delete<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
         return this.instance.delete<T>(url, config);
+    }
+
+    public async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+        return this.instance.patch<T>(url, data, config);
     }
 }
 

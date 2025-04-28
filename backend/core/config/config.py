@@ -32,6 +32,7 @@ class BaseSettingsClass(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     REFRESH_TOKEN_COOKIE: str = "refresh_token_cookie"
+    ACCESS_TOKEN_COOKIE: str = "access_token_cookie"
 
     # Настройки CORS
     CORS_ALLOW_CREDENTIALS: bool = True
@@ -69,6 +70,7 @@ class BaseSettingsClass(BaseSettings):
     CSRF_SECRET: str = Field(..., env="CSRF_SECRET", description="Секретный ключ для CSRF")
     CSRF_TOKEN_EXPIRE_MINUTES: int = 30
     CSRF_HEADER_NAME: str = "X-CSRF-Token"
+    CSRF_COOKIE_NAME: str = "csrf_token"
     BCRYPT_ROUNDS: int = 12
     MIN_LENGTH: int = 8
     MAX_FAILED_ATTEMPTS: int = 5
@@ -109,8 +111,8 @@ class DevelopmentSettings(BaseSettingsClass):
     """
     DEBUG: bool = True
     SQLALCHEMY_ECHO: bool = True
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
-    FRONTEND_URL: str = "http://127.0.0.1:8000"
+    CORS_ORIGINS: List[str] = ["http://127.0.0.1:5173"]
+    FRONTEND_URL: str = "http://127.0.0.1:5173"
 
     # Проверка обязательных переменных окружения
     @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')

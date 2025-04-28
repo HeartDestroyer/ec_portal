@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -20,8 +20,8 @@ class Group(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, doc="Название группы")
-    description: Mapped[str | None] = mapped_column(String(512), nullable=True, doc="Описание группы")
-    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey('groups.id'), nullable=True, doc="ID родительской группы")
+    description: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, doc="Описание группы")
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey('groups.id'), nullable=True, doc="ID родительской группы")
 
     # Связи
     users: Mapped[List["User"]] = relationship("User", back_populates="group")

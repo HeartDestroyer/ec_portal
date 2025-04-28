@@ -1,3 +1,9 @@
+
+/**
+ * Типы для работы с маршрутами
+ * Содержит типы для работы с маршрутами
+ */
+
 import { ReactNode } from 'react';
 
 export interface RouteConfig {
@@ -16,8 +22,6 @@ export interface PublicRoutes {
 
 export interface PrivateRoutes {
     DASHBOARD: string;
-    PROFILE: string;
-    SETTINGS: string;
 }
 
 export interface RoutePaths {

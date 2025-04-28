@@ -1,6 +1,6 @@
 # backend/core/security/csrf.py
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Response
 from typing import Optional, Callable
 import secrets
 import hmac
@@ -19,6 +19,7 @@ class CSRFProtection:
         self.secret = settings.CSRF_SECRET.encode()
         self.header_name = settings.CSRF_HEADER_NAME
         self.max_age_seconds = settings.CSRF_TOKEN_EXPIRE_MINUTES * 60
+        self.csrf_cookie_name = settings.CSRF_COOKIE_NAME
 
     # Генерация CSRF токена с временной меткой
     def generate_token(self) -> str:
@@ -107,6 +108,21 @@ class CSRFProtection:
                 return await func(request, *args, **kwargs)
             return wrapper
         return decorator
+
+    # Установка CSRF токена в cookie
+    async def set_csrf_token_cookie(self, response: Response, csrf_token: str) -> None:
+        """
+        Установка `CSRF` токена в cookie
+        :param response: Response объект
+        :param csrf_token: `CSRF` токен
+        """
+        response.set_cookie(
+            key=self.csrf_cookie_name,
+            value=csrf_token,
+            secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
+            samesite="lax",
+            httponly=False
+        )
 
 csrf_handler = CSRFProtection(settings)
 

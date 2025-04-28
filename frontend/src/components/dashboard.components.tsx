@@ -1,7 +1,7 @@
 import React from 'react';
-import { Layout, Menu } from 'antd';
-import { useAuth } from '@/context/AuthContext';
-import LogoutButton from '@/authorization/LogoutButton';
+import { Layout } from 'antd';
+import { useAuth } from '@/context/auth.context';
+import LogoutButton from '@/auth/logout.button';
 
 const { Header, Content } = Layout;
 

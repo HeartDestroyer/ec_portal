@@ -1,10 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+    server: {
+        host: '127.0.0.1',
+        port: 5173,
+    },
     plugins: [
         react(),
         tailwindcss(),
@@ -14,6 +18,16 @@ export default defineConfig({
             brotliSize: true 	// покажет размеры после brotli-сжатия
         })
     ],
+    css: {
+        preprocessorOptions: {
+            less: {
+                javascriptEnabled: true,
+                modifyVars: {
+                    '@primary-color': '#0D3B66',
+                },
+            },
+        },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),

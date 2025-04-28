@@ -54,7 +54,7 @@ class AuthenticationService:
         """
         Регистрация нового пользователя в таблице `users`
         :param user_data: Данные пользователя для регистрации
-        :return: Пользователь
+        :return: Пользователь и сообщение
         """
         existing_user = await self.get_user_by_login_or_email(user_data.login)
         if existing_user:
@@ -91,7 +91,7 @@ class AuthenticationService:
             except Exception as err:
                 logger.error(f"Ошибка в отправке письма для подтверждения {new_user.email}: {err}")
 
-        return new_user
+        return new_user, "Письмо для подтверждения отправлено"
 
     # Аутентификация пользователя
     async def authenticate_user(self, login_or_email: str, password: str) -> tuple[User, str, str]:
@@ -249,7 +249,7 @@ class AuthenticationService:
     async def reset_password_service(self, data: ResetPassword) -> None:
         """
         Сброс `password` пользователя
-        :param data: Данные для сброса пароля
+        :param data: Данные для сброса пароля `token`, `new_password`
         """
         if not self.email_manager:
             raise HTTPException(status_code=500, detail="Сервис Email не настроен")

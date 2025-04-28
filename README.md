@@ -40,3 +40,11 @@
 ## Документация API
     Swagger UI: http://localhost:8000/docs
     ReDoc: http://localhost:8000/redoc
+
+
+## Логика backend
+    Refresh токен всегда хранится в HttpOnly cookie
+    Access токен возвращается в теле ответа (и его должен хранить фронт)
+    Logout удаляет refresh cookie и отзывает токены
+    Обновление токенов использует refresh токен из HttpOnly cookie, возвращает новый access токен и обновляет refresh cookie
+    CSRF токен кладётся в обычную cookie (httponly=False), чтобы фронт мог его прочитать

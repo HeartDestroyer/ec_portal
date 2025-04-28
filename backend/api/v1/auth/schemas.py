@@ -72,15 +72,6 @@ class ResetPassword(BaseModel):
 
 
 # --- Схемы для ответов ---
-# Схема для ответа на аутентификацию пользователя / сброс пароля
-class TokenResponse(BaseModel):
-    """
-    Схема для ответа на запрос сброса пароля
-    """
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
 # Схема для базовой информации о пользователе
 class UserBase(BaseModel):
     """
@@ -90,7 +81,8 @@ class UserBase(BaseModel):
     login: str
     email: EmailStr
     name: str
-    phone: Optional[str] = None
+    role: Role
+    phone: str
 
     is_active: bool
     is_verified: bool
@@ -113,14 +105,28 @@ class UserPrivateProfile(UserBase):
     """
     Схема для приватной информации о пользователе
     """
-    # Добавляем поля, видимые только владельцу
+    work_position: Optional[str] = None
+    date_employment: Optional[date] = None
+    city: Optional[City] = None
+    date_birthday: Optional[date] = None
+    company: Optional[Company] = None
+    bitrix_id: Optional[int] = None
+    qr_code_vcard: Optional[str] = None
     user_email: Optional[str] = None
     telegram_id: Optional[str] = None
-    date_employment: Optional[date] = None
-    date_birthday: Optional[date] = None
-    bitrix_id: Optional[int] = None
+    gender: Optional[Gender] = None
+    photo_url: Optional[str] = None
+    photo_url_small: Optional[str] = None
+    bio: Optional[str] = None
+    role: Role
+    additional_role: Optional[AdditionalRole] = None
     created_at: datetime
+    updated_at: datetime
     last_login: Optional[datetime] = None
+    failed_login_attempts: int = 0
+    locked_until: Optional[datetime] = None
+    last_password_change: Optional[datetime] = None
+
 
 # Схема для ответа на запрос
 class MessageResponse(BaseModel):

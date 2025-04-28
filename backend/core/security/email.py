@@ -149,7 +149,7 @@ class EmailManager:
         )
 
         # Формируем URL для верификации
-        verification_url = f"{settings.FRONTEND_URL}/api/v1/auth/verify-email?token={token}"
+        verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
 
         # Отправляем email
         return await self._send_email(

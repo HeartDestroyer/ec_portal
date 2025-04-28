@@ -1,8 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { login, logout, register } from '@/services/authService';
-import { LoginFormData, RegisterFormData, AuthResponse, User } from '@/types/auth.types';
-import { apiService } from '@/services/api.service';
-import { API_CONFIG } from '@/config/app.config';
+/**
+ * Контекст для авторизации
+ * Содержит информацию о пользователе, аутентификацию и методы для работы с ней
+ */
+
+import React, { createContext, useContext, useState } from 'react';
+import { LoginFormData, RegisterFormData, User } from '@/types/auth.types';
+import { authService } from '@/services/auth.service';
 
 interface AuthContextType {
     isAuthenticated: boolean;
@@ -10,7 +13,7 @@ interface AuthContextType {
     user: User | null;
     login: (data: LoginFormData) => Promise<void>;
     register: (data: RegisterFormData) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
     loadUserData: () => Promise<void>;
 }
 
@@ -22,45 +25,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [user, setUser] = useState<User | null>(null);
 
     const loadUserData = async () => {
+        setIsLoading(true);
         try {
-            const response = await apiService.get<User>('/api/v1/user/profile');
-            setUser(response.data);
+            const response = await authService.getCurrentUser();
+            setUser(response as User);
+            setIsAuthenticated(true);
         } catch (error) {
+            setUser(null);
+            setIsAuthenticated(false);
             console.error('Ошибка загрузки данных пользователя:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            try {
-                await apiService.get('/api/v1/auth/verify');
-                setIsAuthenticated(true);
-                await loadUserData();
-            } catch (error) {
-                setIsAuthenticated(false);
-                setUser(null);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        checkAuth();
-    }, []);
-
     const handleLogin = async (data: LoginFormData) => {
-        await login(data);
+        await authService.login(data);
         setIsAuthenticated(true);
         await loadUserData();
     };
 
     const handleRegister = async (data: RegisterFormData) => {
-        await register(data);
-        setIsAuthenticated(true);
-        await loadUserData();
+        await authService.register(data);
     };
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        await authService.logout();
         setIsAuthenticated(false);
         setUser(null);
     };
@@ -85,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
+        throw new Error('useAuth необходимо использовать внутри контекста AuthProvider');
     }
     return context;
-}; 
+};
