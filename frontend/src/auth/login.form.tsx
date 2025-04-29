@@ -19,7 +19,7 @@ const LoginForm: React.FC = () => {
             setIsSubmitting(true);
             await login(values);
             form.resetFields();
-            navigate(APP_CONFIG.ROUTES.PRIVATE.DASHBOARD);
+            navigate(APP_CONFIG.ROUTES.PRIVATE.START);
         } catch (error: any) {
             console.log("Ошибка авторизации", error);
         } finally {

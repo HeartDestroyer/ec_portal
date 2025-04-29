@@ -1,3 +1,6 @@
+// Компонент 404
+// Страница, которая отображается, если пользователь пытается получить доступ к несуществующей странице
+
 import React from "react";
 import { Result, Button } from "antd";
 import { Link } from "react-router-dom";

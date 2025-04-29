@@ -31,6 +31,9 @@ export const API_CONFIG = {
         USER: {
             INFO: '/api/v1/auth/me',
         },
+        CACHE: {
+            CLEAR: '/api/v1/cache/clear'
+        }
     },
 } as const;
 
@@ -48,7 +51,7 @@ export const APP_CONFIG = {
             NOT_FOUND: '/404',
         } as RoutePaths['PUBLIC'],
         PRIVATE: {
-            DASHBOARD: '/',
+            START: '/',
         } as RoutePaths['PRIVATE'],
     },
 } as const;

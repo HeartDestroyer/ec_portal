@@ -206,8 +206,8 @@ def register_routers(app: FastAPI):
     """
     Регистрация роутеров
     """
-    from api.v1.auth.routes import auth_router
-    app.include_router(auth_router, prefix=settings.API_PREFIX)
+    from api.v1.routes import api_router
+    app.include_router(api_router, prefix=settings.API_PREFIX)
 
 app = create_application()
 

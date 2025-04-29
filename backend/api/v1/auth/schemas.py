@@ -82,7 +82,7 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
     role: Role
-    phone: str
+    phone: Optional[str] = None
 
     is_active: bool
     is_verified: bool
@@ -105,6 +105,8 @@ class UserPrivateProfile(UserBase):
     """
     Схема для приватной информации о пользователе
     """
+    group_id: Optional[uuid.UUID] = None
+    department_id: Optional[uuid.UUID] = None
     work_position: Optional[str] = None
     date_employment: Optional[date] = None
     city: Optional[City] = None

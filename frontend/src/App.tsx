@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ConfigProvider, Spin } from 'antd';
 import { AuthProvider, useAuth } from '@/context/auth.context';
 import { publicRoutes, protectedRoutes } from '@/routes';
@@ -22,6 +22,7 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     const { isAuthenticated, isLoading } = useAuth();
+    const location = useLocation();
 
     if (isLoading) {
         return (
@@ -52,8 +53,17 @@ const App: React.FC = () => {
                                 key={route.path}
                                 path={route.path}
                                 element={<ProtectedRoute>{route.element}</ProtectedRoute>}
-                            />
-                        ))}
+                            >
+                                {route.children && route.children.map((child) => (
+                                <Route
+                                    key={child.index ? 'index' : child.path}
+                                    index={child.index}
+                                    path={child.path}
+                                    element={child.element}
+                                />
+                                ))}
+                            </Route>
+                            ))}
                     </Routes>
                 </Router>
             </AuthProvider>

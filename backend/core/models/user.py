@@ -13,7 +13,7 @@ from core.models.group import Group
 
 # Роли пользователей
 class Role(enum.Enum):
-    SUPER_ADMIN = "super_admin"
+    SUPER_ADMIN = "superadmin"
     ADMIN = "admin"
     LEADER = "leader"
     EMPLOYEE = "employee"

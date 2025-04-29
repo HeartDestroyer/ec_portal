@@ -161,7 +161,7 @@ class AuthenticationService:
         payload = await self.jwt_handler.verify_token(refresh_token, "refresh", self.redis)
 
         # Получение пользователя
-        user_id = int(payload["sub"])
+        user_id = uuid.UUID(payload["sub"])
         query = select(User).where(User.id == user_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()

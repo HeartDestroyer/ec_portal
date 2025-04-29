@@ -3,7 +3,7 @@
  * Содержит информацию о пользователе, аутентификацию и методы для работы с ней
  */
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { LoginFormData, RegisterFormData, User } from '@/types/auth.types';
 import { authService } from '@/services/auth.service';
 
@@ -38,6 +38,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadUserData();
+    }, []);
 
     const handleLogin = async (data: LoginFormData) => {
         await authService.login(data);

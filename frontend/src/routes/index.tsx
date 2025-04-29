@@ -1,4 +1,3 @@
-
 /**
  * Маршруты для авторизации
  * Содержит маршруты для авторизации
@@ -10,9 +9,10 @@ import LoginForm from '../auth/login.form';
 import RegisterForm from '../auth/register.form';
 import ResetPassword from '../auth/password-recovery.form';
 import NotFound from '../technical/404.component';
-import Dashboard from '../components/dashboard.components';
 import HomeRoute from '../components/home.route';
 import VerifyEmailPage from '../auth/verify-email.pages';
+import DashboardLayout from '@/technical/layout.page';
+import Dashboard from '../components/dashboard.components';
 
 export const publicRoutes: RouteObject[] = [
     {
@@ -43,7 +43,13 @@ export const publicRoutes: RouteObject[] = [
 
 export const protectedRoutes: RouteObject[] = [
     {
-        path: APP_CONFIG.ROUTES.PRIVATE.DASHBOARD,
-        element: <Dashboard />
-    },
+        path: APP_CONFIG.ROUTES.PRIVATE.START,
+        element: <DashboardLayout />,
+        children: [
+            {
+                index: true,
+                element: <Dashboard />
+            }
+        ]
+    }
 ];

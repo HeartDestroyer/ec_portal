@@ -2,7 +2,6 @@
     font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
     line-height: 1.5;
     font-weight: 400;
-
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -39,11 +38,37 @@ h1 {
 	}
 }
 
-
+/* Кастомные стили для кнопок */
 .ant-btn-variant-solid {
     color: #fff;
     background: #0d3b66;
     box-shadow: none;
+}
+
+/* Кастомные стили для меню */
+.ant-menu-light .ant-menu-item-selected {
+    background-color: #e6f4ff !important;
+}
+
+.ant-menu-light.ant-menu-inline .ant-menu-sub.ant-menu-inline {
+    background-color: #fff !important;
+}
+
+/* Кастомный скролл */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+.custom-scrollbar-menu::-webkit-scrollbar {
+	width: 0px;
+	height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background-color: #e5e5e5; /* Цвет скроллбара */
+	border-radius: 25px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+	background-color: #ffffff; /* Цвет фона скроллбара */
 }
 
 @import "tailwindcss";

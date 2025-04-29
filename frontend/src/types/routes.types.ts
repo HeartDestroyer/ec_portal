@@ -18,10 +18,12 @@ export interface PublicRoutes {
     PASSWORD_RECOVERY: string;
     RESET_PASSWORD: string;
     NOT_FOUND: string;
+    VERIFY_EMAIL: string;
+    START: string;
 }
 
 export interface PrivateRoutes {
-    DASHBOARD: string;
+    START: string;
 }
 
 export interface RoutePaths {
