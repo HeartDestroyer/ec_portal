@@ -1,11 +1,19 @@
+@import 'tailwindcss';
+@import "@fontsource-variable/public-sans";
+
 :root {
-    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; 
     line-height: 1.5;
     font-weight: 400;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+/* Глобальное переопределение шрифта для Ant Design */
+.ant-layout, .ant-layout *, body, body * {
+	font-family: 'Public Sans Variable', system-ui, sans-serif !important;
 }
 
 a {
@@ -29,12 +37,37 @@ body {
 h1 {
 	font-size: 1.875rem /* 24px */;
 	line-height: 2.5rem /* 32px */;
+	font-weight: 600;
+	margin-bottom: 0.25rem;
 }
 
 @media (max-width: 640px) {
 	h1 {
 		font-size: 1.5rem /* 24px */;
     	line-height: 2rem /* 32px */;
+	}
+}
+
+@keyframes fadeInScale {
+	0% {
+		opacity: 0;
+		transform: scale(0.8);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
 	}
 }
 
@@ -47,11 +80,26 @@ h1 {
 
 /* Кастомные стили для меню */
 .ant-menu-light .ant-menu-item-selected {
-    background-color: #e6f4ff !important;
+    background-color: #0d3b66 !important;
+	color: #fff !important;
 }
-
+.ant-menu-inline.ant-menu-root .ant-menu-item {
+    transition: border-color 0.1s, background 0.1s !important;
+}
+.ant-menu .ant-menu-item .anticon +span{
+	transition: color 0.1s !important;
+}
 .ant-menu-light.ant-menu-inline .ant-menu-sub.ant-menu-inline {
     background-color: #fff !important;
+}
+.ant-menu-light.ant-menu-root.ant-menu-inline {
+	border-inline-end: none !important;
+}
+.custom-menu{
+	border-right: 1px solid #e5e5e5 !important;
+}
+.ant-menu-submenu>ul>li {
+	padding-left: 36px !important;
 }
 
 /* Кастомный скролл */
@@ -71,4 +119,26 @@ h1 {
 	background-color: #ffffff; /* Цвет фона скроллбара */
 }
 
-@import "tailwindcss";
+/* Кастомные стили для бейджа */
+.ant-badge .ant-badge-count{
+	line-height: 19px;
+	background: #fff;
+	color: #0d3b66;
+    border: 1px solid #0d3b66;
+	border-radius: 50%;
+	box-shadow: none;
+}
+
+.ant-menu-light .ant-menu-item-selected .ant-badge .ant-badge-count{
+	border: 1px solid #fff;
+	color: #fff;
+	background: #0d3b66;
+}
+
+.animate-header {
+	background-size: 200% auto;
+	animation: gradient 8s infinite, fadeInScale 0.8s ease-out;
+	color: transparent;
+	background-clip: text;
+	background-image: linear-gradient(to right, #990D0A, #0D3B66);
+}

@@ -15,18 +15,16 @@ const UserComponent: React.FC<UserComponentProps> = ({ enterFullscreen, logout }
 
     const userMenu = (
         <Menu>
-            <Menu.Item key="user">
-                <div className="flex flex-col">
-                    <span className="text-sm sm:text-base">Логин: {user?.login}</span>
-                    <span className="text-sm sm:text-base">Телефон: {user?.phone}</span>
-                    <span className="text-sm sm:text-base">Почта: {user?.email}</span>
-                </div>
-            </Menu.Item>
+            <div className="flex flex-col p-2">
+                <span className="text-sm sm:text-base">Логин: {user?.login}</span>
+                <span className="text-sm sm:text-base">Телефон: {user?.phone}</span>
+                <span className="text-sm sm:text-base">Почта: {user?.email}</span>
+            </div>
             <Menu.Divider />
             <Menu.Item key="fullscreen" onClick={enterFullscreen} icon={<FullscreenOutlined />}>
                 <span className="text-sm sm:text-base">На весь экран</span>
             </Menu.Item>
-            <Menu.Item key="logout" onClick={logout} icon={<LogoutOutlined />}>
+            <Menu.Item key="logout" onClick={logout} icon={<LogoutOutlined />} danger={true}>
                 <span className="text-sm sm:text-base">Выйти</span>
             </Menu.Item>
         </Menu>

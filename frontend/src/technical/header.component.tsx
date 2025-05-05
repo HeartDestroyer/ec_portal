@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = memo(({
 
     const headerStyle: React.CSSProperties = {
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20,
-        backgroundColor: '#fff', height: 80, padding: '0 24px'
+        backgroundColor: '#fff', height: 70, padding: '0 30px'
     };
 
     return (
@@ -39,7 +39,7 @@ const Header: React.FC<HeaderProps> = memo(({
                         onClick={toggleSidebar}
                     />
                 </div>
-                <div className='text-2xl sm:text-3xl font-bold text-[#990D0A]'>
+                <div className='text-2xl sm:text-3xl font-bold animate-header'>
                     {import.meta.env.VITE_APP_NAME}
                 </div>
             </div>

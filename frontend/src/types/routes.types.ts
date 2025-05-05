@@ -24,6 +24,25 @@ export interface PublicRoutes {
 
 export interface PrivateRoutes {
     START: string;
+    ADMIN: string;
+    PROFILE: string;
+    LETTER: string;
+    ACHIEVEMENTS: string;
+    EMPLOYEES: string;
+    COMPANY_STRUCTURE: string;
+    LEADER: string;
+    MASTERCLASS: string;
+    LESSONS: string;
+    CHECKLIST: string;
+    HR_TESTING: string;
+    PRESENTATION: string;
+    OBJECTIONS: string;
+    REVIEWS: string;
+    CALCULATOR: string;
+    RESPONSIBLE: string;
+    AUDIO_OBJECTIONS: string;
+    SHOP: string;
+    SETTINGS: string;
 }
 
 export interface RoutePaths {

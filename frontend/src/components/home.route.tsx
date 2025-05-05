@@ -3,7 +3,7 @@
 import React from "react";
 import { useAuth } from "@/context/auth.context";
 import { Spin } from "antd";
-import HomePage from "@/components/home.components";
+import HomePage from "@/components/home.page";
 import { Navigate } from "react-router-dom";
 import { APP_CONFIG } from "@/config/app.config";
 

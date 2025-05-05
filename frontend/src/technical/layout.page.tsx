@@ -57,7 +57,7 @@ const DashboardLayout: React.FC = () => {
                 onMobileMenuOpen={mobileMenuOpen}
             />
             
-            <Layout className="pt-20 !flex-row">
+            <Layout className="pt-[70px] !flex-row !bg-white">
                 <SidebarMenu
                     selectedPath={location.pathname}
                     collapsed={collapsed}
@@ -65,24 +65,20 @@ const DashboardLayout: React.FC = () => {
                     toggleSidebar={() => setCollapsed(!collapsed)}
                     onMobileMenuOpen={mobileMenuOpen}
                 />
-                
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={location.pathname}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.2 }}
-                        className='flex-1 transition-all duration-300'
-                    >
-                        <Content className="p-6">
-                            <div className="p-4 bg-white rounded-lg shadow-md ">
+                    <Content className="p-5">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={location.pathname}
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -30 }}
+                                transition={{ duration: 0.2 }}
+                            >
                                 <Outlet />
-                            </div>
-                        </Content>
-                    </motion.div>
-                </AnimatePresence>
-            </Layout>
+                            </motion.div>
+                        </AnimatePresence>
+                    </Content>
+        </Layout>
         </Layout>
     );
 };

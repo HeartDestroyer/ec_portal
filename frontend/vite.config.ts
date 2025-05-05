@@ -26,7 +26,7 @@ export default defineConfig({
                     '@primary-color': '#0D3B66',
                 },
             },
-        },
+        }
     },
     resolve: {
         alias: {

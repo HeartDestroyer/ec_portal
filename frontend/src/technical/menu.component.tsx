@@ -1,6 +1,7 @@
 // frontend/src/components/layout/SidebarMenu.tsx
 
 import React, { memo, useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, Button, Badge } from 'antd';
 import { DashboardOutlined, UserOutlined, ThunderboltOutlined, 
     ShoppingOutlined, StarOutlined, SettingOutlined, TeamOutlined, 
@@ -8,6 +9,8 @@ import { DashboardOutlined, UserOutlined, ThunderboltOutlined,
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/auth.context';
 import { cache } from '@/services/cache.service';
+import { APP_CONFIG } from '@/config/app.config';
+import { ROLES } from '@/config/roles.config';
 import { motion } from 'framer-motion';
 
 const { SubMenu } = Menu;
@@ -33,13 +36,6 @@ interface MenuItem {
     badge?: number;
 }
 
-const ROLES = {
-    SUPERADMIN: ['superadmin'] as RoleType[],
-    ADMIN: ['superadmin', 'admin'] as RoleType[],
-    LEADER: ['superadmin', 'admin', 'leader'] as RoleType[],
-    WORKERS: ['superadmin', 'admin', 'leader', 'employee'] as RoleType[],
-} as const;
-
 const DEPARTMENTS = {
     HR: [1] as DepartmentType[],
     OTS: [7] as DepartmentType[],
@@ -52,13 +48,13 @@ const NO_NAVIGATE_KEYS = ['cache_reset'];
  */
 const getMenuItems = (): MenuItem[] => [
     {
-        key: '/admin',
+        key: APP_CONFIG.ROUTES.PRIVATE.ADMIN,
         icon: <SettingOutlined />,
         label: 'Администратор',
-        roles: ROLES.ADMIN
+        roles: [...ROLES.ADMIN]
     },
     {
-        key: '/',
+        key: APP_CONFIG.ROUTES.PRIVATE.START,
         icon: <DashboardOutlined />,
         label: 'Главная'
     },
@@ -68,22 +64,22 @@ const getMenuItems = (): MenuItem[] => [
         label: 'Профиль',
         children: [
             {
-                key: '/profile',
+                key: APP_CONFIG.ROUTES.PRIVATE.PROFILE,
                 icon: <ThunderboltOutlined />,
                 label: 'Информация'
             },
             {
-                key: '/letter',
+                key: APP_CONFIG.ROUTES.PRIVATE.LETTER,
                 icon: <ThunderboltOutlined />,
                 label: 'Шаблоны писем',
-                roles: ROLES.WORKERS,
+                roles: [...ROLES.WORKERS],
                 badge: 5
             },
             {
-                key: '/achievement',
+                key: APP_CONFIG.ROUTES.PRIVATE.ACHIEVEMENTS,
                 icon: <ThunderboltOutlined />,
                 label: 'Достижения',
-                roles: ROLES.WORKERS,
+                roles: [...ROLES.WORKERS],
                 badge: 3
             }
         ]
@@ -92,15 +88,15 @@ const getMenuItems = (): MenuItem[] => [
         key: 'Organization',
         icon: <ApartmentOutlined />,
         label: 'Организация',
-        roles: ROLES.WORKERS,
+        roles: [...ROLES.WORKERS],
         children: [
             {
-                key: '/groups',
+                key: APP_CONFIG.ROUTES.PRIVATE.EMPLOYEES,
                 icon: <ThunderboltOutlined />,
                 label: 'Сотрудники'
             },
             {
-                key: '/organization',
+                key: APP_CONFIG.ROUTES.PRIVATE.COMPANY_STRUCTURE,
                 icon: <ThunderboltOutlined />,
                 label: 'Структура'
             }
@@ -110,83 +106,87 @@ const getMenuItems = (): MenuItem[] => [
         key: 'Training',
         icon: <VideoCameraOutlined />,
         label: 'Обучение',
-        roles: ROLES.WORKERS,
+        roles: [...ROLES.WORKERS],
         children: [
             {
-                key: '/education',
+                key: APP_CONFIG.ROUTES.PRIVATE.LEADER,
                 icon: <ThunderboltOutlined />,
                 label: 'Руководители',
-                roles: ROLES.LEADER,
+                roles: [...ROLES.LEADER],
             },
             {
-                key: '/masterclass',
+                key: APP_CONFIG.ROUTES.PRIVATE.MASTERCLASS,
                 icon: <ThunderboltOutlined />,
                 label: 'Мастер классы'
             },
             {
-                key: '/lessons',
+                key: APP_CONFIG.ROUTES.PRIVATE.LESSONS,
                 icon: <ThunderboltOutlined />,
                 label: 'Видеоуроки'
             },
             {
-                key: '/checklist',
+                key: APP_CONFIG.ROUTES.PRIVATE.CHECKLIST,
                 icon: <ThunderboltOutlined />,
                 label: 'Чек-лист новичка'
             },                
         ]
     },
     {
-        key: '/candidates',
+        key: APP_CONFIG.ROUTES.PRIVATE.HR_TESTING,
         icon: <StarOutlined />,
-        label: 'HR-тестирование'
+        label: 'HR-тестирование',
+        roles: [...ROLES.WORKERS]
     },
     {
-        key: '/presentation',
+        key: APP_CONFIG.ROUTES.PRIVATE.PRESENTATION,
         icon: <StarOutlined />,
-        label: 'Презентация'
+        label: 'Презентация',
+        roles: [...ROLES.WORKERS]
     },
     {
-        key: '/objections',
+        key: APP_CONFIG.ROUTES.PRIVATE.OBJECTIONS,
         icon: <StarOutlined />,
-        label: 'Возражения'
+        label: 'Возражения',
+        roles: [...ROLES.WORKERS]
     },
     {
         key: 'Assistant',
         icon: <StarOutlined />,
         label: 'Инструменты',
-        roles: ROLES.WORKERS,
+        roles: [...ROLES.WORKERS],
         children: [
             {
-                key: '/reviews',
+                key: APP_CONFIG.ROUTES.PRIVATE.REVIEWS,
                 icon: <ThunderboltOutlined />,
-                label: 'Отзывы клиентов',
+                label: 'Отзывы партнеров',
             },
             {
-                key: '/calculator',
+                key: APP_CONFIG.ROUTES.PRIVATE.CALCULATOR,
                 icon: <ThunderboltOutlined />,
                 label: 'Калькулятор ОТС'
             },
             {
-                key: '/responsible',
+                key: APP_CONFIG.ROUTES.PRIVATE.RESPONSIBLE,
                 icon: <ThunderboltOutlined />,
                 label: 'Справочник'
             },
             {
-                key: '/audio',
+                key: APP_CONFIG.ROUTES.PRIVATE.AUDIO_OBJECTIONS,
                 icon: <ThunderboltOutlined />,
                 label: 'Аудио-возражения'
             },                
         ]
     },
     {
-        key: '/shop',
+        key: APP_CONFIG.ROUTES.PRIVATE.SHOP,
         icon: <ShoppingOutlined />,
-        label: 'Магазин'
+        label: 'Магазин',
+        roles: [...ROLES.WORKERS]
     },
     {
-        key: '/settings',
+        key: APP_CONFIG.ROUTES.PRIVATE.SETTINGS,
         icon: <SettingOutlined />,
-        label: 'Настройки'
+        label: 'Настройки',
     },
 ];
 
@@ -233,10 +233,14 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
 
     /** Обработчики */
     const onMenuSelect = useCallback(
-        (e: { key: string }) => {
-            if (!NO_NAVIGATE_KEYS.includes(e.key)) {
-                navigate(e.key);
-                if (window.innerWidth < 1024) closeSidebar();
+        (info: { key: string; domEvent: React.KeyboardEvent<HTMLElement> | React.MouseEvent<HTMLElement, MouseEvent>}) => {
+            if (!NO_NAVIGATE_KEYS.includes(info.key)) {
+                if ('button' in info.domEvent && info.domEvent.ctrlKey) {
+                    window.open(info.key, '_blank');
+                } else {
+                    navigate(info.key);
+                    if (window.innerWidth < 1024) closeSidebar();
+                }
             }
         },
         [closeSidebar, navigate]
@@ -264,12 +268,12 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
         return (
             <Menu.Item
                 key={item.key}
-                icon={
-                    item.icon
-                }
+                icon={item.icon}
                 className='flex items-center'
             >
-                {item.label}
+                <Link to={item.key} style={{ fontWeight: '400', textDecoration: 'none' }}>
+                    {item.label}
+                </Link>                            
                 <Badge count={item?.badge} offset={[10, 0]} />
             </Menu.Item>
         );
@@ -280,32 +284,32 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
             <div className={`
                 ${onMobileMenuOpen ? 'fixed top-0 left-0 bottom-0 z-40' : 'relative translate-x-0'}
                 ${collapsed ? '-translate-x-full' : 'translate-x-0'}
-                transition-transform transform shadow-lg
+                transition-transform transform
             `}>
 
                 {/* Кнопка сворачивания/разворачивания меню */}
                 <div className= {`
                     ${onMobileMenuOpen ? 'hidden' : 'block'} 
-                    absolute top-3 -right-4 z-50 bg-white rounded-full
+                    absolute top-3 -right-3 z-50 bg-white rounded-full
                 `}>
                     <Button
-                        type="default"
-                        size='middle'
-                        icon={collapsed ? <RightOutlined /> : <LeftOutlined />}
+                        type="dashed"
+                        size='small'
+                        icon={collapsed ? <RightOutlined className='w-3 h-3'/> : <LeftOutlined className='w-3 h-3'/>}
                         onClick={toggleSidebar}
-                        className='!rounded-full'
+                        className='!rounded-full !text-sm'
                     />
                 </div>
 
                 {/* Меню */}
                 <div className={`
                     ${collapsed ? '!w-20' : '!w-64'}
-                    ${onMobileMenuOpen ? 'h-full' : 'h-[calc(100vh-80px)]'}
-                    custom-scrollbar custom-scrollbar-menu
-                    z-40 sticky top-20 transition-all duration-300 bg-white
+                    ${onMobileMenuOpen ? 'h-full' : 'h-[calc(100vh-70px)]'}
+                    custom-scrollbar custom-scrollbar-menu custom-menu
+                    z-40 sticky top-20 transition-all duration-300 bg-white overflow-y-auto
                 `}>
                     <Menu
-                        className='h-full !pt-2 font-medium !text-base'
+                        className={`h-full !pt-2 ${collapsed ? '' : '!px-3'} !text-[15px]`}
                         selectedKeys={[selectedPath]}
                         defaultOpenKeys={[location.pathname.split('/')[2]]}
                         mode="inline"
@@ -316,7 +320,7 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
                         {filteredMenuItems.map(renderMenuItem)}
 
                         {/* Сброс кэша */}
-                        {user?.role && ROLES.WORKERS.includes(user.role as RoleType) && (
+                        {user?.role && ROLES.ADMIN.includes(user.role as "superadmin" | "admin") && (
                             <Menu.Item 
                                 key="cache_reset" 
                                 icon={<ThunderboltOutlined />} 

@@ -8,17 +8,22 @@ cache_router = APIRouter(prefix="/api/v1/cache", tags=["Управление к�
 
 @cache_router.post(
     "/clear",
-    summary="Очистка кэша"
+    summary="Очистка кэша (ключи с префиксом cache:)"
 )
 async def clear_cache(
     redis: Redis = Depends(get_redis)
 ):
     """
-    Очищает весь кэш Redis
+    Очищает только кэш (ключи с префиксом cache:)
     """
     try:
-        await redis.flushdb()
-        return {"message": "Кэш успешно очищен"}
+        keys_cache = await redis.keys("cache:*") # Получение ключей с префиксом cache:
+        keys_all = await redis.keys('*') # Получение всех ключей
+
+        if keys_cache:
+            await redis.delete(*keys_cache)
+
+        return {"message": f"Кэш успешно очищен, удалено {len(keys_cache)} ключей из {len(keys_all)}"}
     except Exception as err:
         logger.error(f"Ошибка при очистке кэша: {err}")
         raise HTTPException(
