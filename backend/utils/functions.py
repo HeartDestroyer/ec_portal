@@ -28,17 +28,25 @@ def format_date(date_str: str) -> Optional[str]:
 def format_phone_number(phone_number: str) -> Optional[str]:
     """
     Форматирование номера телефона в международный формат
-    :param phone_number: Номер телефона для форматирования
+    :param `phone_number`: Номер телефона для форматирования
     :return: Отформатированный номер телефона или None в случае ошибки
     """
     try:
-        parsed = phonenumbers.parse(phone_number, None)
+        # Если номер начинается с 8, заменяем на +7
+        if phone_number.startswith('8'):
+            phone_number = '+7' + phone_number[1:]
+        
+        # Если номер не начинается с +, добавляем +7
+        if not phone_number.startswith('+'):
+            phone_number = '+7' + phone_number
+
+        parsed = phonenumbers.parse(phone_number, "RU")
         if phonenumbers.is_valid_number(parsed):
             return phonenumbers.format_number(parsed, PhoneNumberFormat.INTERNATIONAL)
         else:
-            return None
+            return phone_number
     except phonenumbers.NumberParseException:
-        return None
+        return phone_number
 
 # Валидация email адреса
 def validate_email(email: str) -> bool:

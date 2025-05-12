@@ -3,13 +3,14 @@
 import enum
 import uuid
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import String, Boolean, DateTime, Date, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from core.models.base import Base
 from core.models.department import Department
 from core.models.group import Group
+from core.models.session import Session
 
 # Роли пользователей
 class Role(enum.Enum):
@@ -96,6 +97,7 @@ class User(Base):
     # Связи
     department: Mapped[Optional["Department"]] = relationship("Department", back_populates="users")
     group: Mapped[Optional["Group"]] = relationship("Group", back_populates="users")
+    sessions: Mapped[List["Session"]] = relationship("Session", back_populates="user", cascade="all, delete-orphan")
     
     # Методы сериализации
     def to_dict(self):
@@ -134,18 +136,12 @@ class User(Base):
     # Сериализация модели пользователя в словарь с публичными данными
     def to_public_dict(self):
         """
-        Сериализация модели пользователя в словарь с публичными данными
+        Сериализация модели пользователя в словарь с публичными данными 
+        `login`, `name`, `email`
         """
         return {
-            "id": str(self.id),
+            "login": self.login,
             "name": self.name,
-            "work_position": self.work_position,
-            "department": self.department.name if self.department else None,
-            "group": self.group.name if self.group else None,
-            "city": self.city.value if self.city else None,
-            "company": self.company.value if self.company else None,
-            "user_email": self.user_email,
-            "photo_url": self.photo_url,
-            "photo_url_small": self.photo_url_small,
-            "bio": self.bio
+            "email": self.email,
+            "phone": self.phone,
         }

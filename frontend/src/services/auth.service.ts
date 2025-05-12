@@ -5,85 +5,134 @@
 
 import { API_CONFIG } from '../config/app.config';
 import { apiService } from './api.service';
-import { LoginFormData, RegisterFormData, ResetPasswordFormData } from '@/types/auth.types';
-import { showBackendMessage } from '@/utils/show.message';
+import { LoginFormData, RegisterFormData, NewPasswordFormData } from '@/types/auth.types';
+import { showMessage } from '@/utils/show.message';
 
+/** Сервис для работы с авторизацией */
 class AuthService {
-    // Вход в систему
+
+    /** Вход в систему */
     async login(credentials: LoginFormData) {
         try {
             const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.LOGIN, credentials);
-            showBackendMessage(response, 'success');
+            showMessage(response, 'success');
             return response.data;
         } catch (error: any) {
-            showBackendMessage(error.response, 'error');
+            showMessage(error.response, 'error');
             throw error;
         }
     }
 
-    // Регистрация пользователя
+    /** Регистрация пользователя */
     async register(data: RegisterFormData) {
         try {
             const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.REGISTER, data);
-            showBackendMessage(response, 'success');
+            showMessage(response, 'success');
             return response.data;
         } catch (error: any) {
-            showBackendMessage(error.response, 'error');
+            showMessage(error.response, 'error');
             throw error;
         }
     }
 
-    // Выход из системы
+    /** Выход из системы */
     async logout() {
         try {
             const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.LOGOUT);
-            showBackendMessage(response, 'success');
+            showMessage(response, 'success');
         } catch (error: any) {
-            showBackendMessage(error.response, 'error');
+            showMessage(error.response, 'error');
             throw error;
         }
     }
 
-    // Запрос на получение текущего пользователя
+    /** Получение данных текущего пользователя */
     async getCurrentUser() {
         const response = await apiService.get(API_CONFIG.ENDPOINTS.USER.INFO);
         return response.data;
     }
 
-    // Запрос на сброс пароля
+    /** Запрос на сброс пароля */
     async requestPasswordReset(email: string) {
-        const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.REQUEST_PASSWORD_RESET, { email });
-        return response.data;
-    }
-
-    // Сброс пароля
-    async resetPassword(data: ResetPasswordFormData) {
-        const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, data);
-        return response.data;
-    }
-
-    // Подтверждение email
-    async verifyEmail(token: string) {
         try {
-            const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, { params: { token } });
-            showBackendMessage(response, 'success');
+            const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.REQUEST_PASSWORD_RESET, { email });
+            showMessage(response, 'success');
             return response.data;
         } catch (error: any) {
-            showBackendMessage(error.response, 'error');
+            showMessage(error.response, 'error');
             throw error;
         }
     }
 
-    // Повторная отправка email для подтверждения
+    /** Установка нового пароля - Сброс пароля */
+    async setNewPassword(data: NewPasswordFormData) {
+        try {
+            const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.RESET_PASSWORD, data);
+            showMessage(response, 'success');
+            return response.data;
+        } catch (error: any) {
+            showMessage(error.response, 'error');
+            throw error;
+        }
+    }
+
+    /** Подтверждение email */
+    async verifyEmail(token: string) {
+        try {
+            const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.VERIFY_EMAIL, { params: { token } });
+            showMessage(response, 'success');
+            return response.data;
+        } catch (error: any) {
+            showMessage(error.response, 'error');
+            throw error;
+        }
+    }
+
+    /** Повторная отправка email для подтверждения */
     async resendVerificationEmail() {
         const response = await apiService.post(API_CONFIG.ENDPOINTS.AUTH.RESEND_VERIFICATION);
         return response.data;
     }
 
-    // Получение CSRF токена
+    /** Получение CSRF токена */
     async getCSRFToken() {
         const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.CSRF);
         return response.data;
+    }
+
+    /** Получение активных сессий пользователя */
+    async getActiveSessions() {
+        try {
+            const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.SESSIONS);
+            return response.data;
+        } catch (error: any) {
+            showMessage(error.response, 'error');
+            throw error;
+        }
+    }
+
+    /** Завершение конкретной сессии */
+    async terminateSession(sessionId: string) {
+        try {
+            const response = await apiService.delete(`${API_CONFIG.ENDPOINTS.AUTH.SESSIONS}/${sessionId}`);
+            showMessage(response, 'success');
+            return response.data;
+        } catch (error: any) {
+            showMessage(error.response, 'error');
+            throw error;
+        }
+    }
+
+    /** Завершение всех сессий кроме текущей */
+    async terminateOtherSessions() {
+        try {
+            const response = await apiService.delete(API_CONFIG.ENDPOINTS.AUTH.SESSIONS);
+            showMessage(response, 'success');
+            return response.data;
+        } catch (error: any) {
+            showMessage(error.response, 'error');
+            throw error;
+        }
     }
 }
 

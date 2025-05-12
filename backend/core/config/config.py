@@ -64,8 +64,8 @@ class BaseSettingsClass(BaseSettings):
     MAIL_SSL: bool = Field(True, env="MAIL_SSL")
 
     # Настройки безопасности
-    SECURITY_PASSWORD_SALT: str = Field(..., env="SECURITY_PASSWORD_SALT")
-    SECRET_KEY_SIGNED_URL: str = Field(..., env="SECRET_KEY_SIGNED_URL")
+    SECURITY_PASSWORD_SALT: str = Field(..., env="SECURITY_PASSWORD_SALT", description="Секретный ключ для безопасности паролей")
+    SECRET_KEY_SIGNED_URL: str = Field(..., env="SECRET_KEY_SIGNED_URL", description="Секретный ключ для подписанных URL")
     SESSION_LIFETIME: int = 86400
     CSRF_SECRET: str = Field(..., env="CSRF_SECRET", description="Секретный ключ для CSRF")
     CSRF_TOKEN_EXPIRE_MINUTES: int = 30

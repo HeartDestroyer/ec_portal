@@ -1,9 +1,9 @@
 # backend/api/auth/schemas.py
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime
 import uuid
-# Импортируем Enum из моделей
+
 from core.models.user import Role, AdditionalRole, Gender, Company, City
 from core.security.password import password_manager
 
@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="Email пользователя (уникальный)")
     name: str = Field(..., max_length=128, description="Полное имя")
     password: str = Field(..., description="Пароль")
-    phone: Optional[str] = Field(None, max_length=25, description="Телефон")
+    phone: Optional[str] = Field(None, max_length=25, description="Номер телефона")
     
     @field_validator('password')
     def validate_password(cls, v):
@@ -129,7 +129,6 @@ class UserPrivateProfile(UserBase):
     locked_until: Optional[datetime] = None
     last_password_change: Optional[datetime] = None
 
-
 # Схема для ответа на запрос
 class MessageResponse(BaseModel):
     """
@@ -143,3 +142,21 @@ class CSRFTokenResponse(BaseModel):
     Схема для ответа на запрос CSRF токена
     """
     csrf_token: str
+
+class SessionResponse(BaseModel):
+    """
+    Схема для ответа с информацией о сессии
+    """
+    id: uuid.UUID
+    device: Optional[str] = None
+    browser: Optional[str] = None
+    os: Optional[str] = None
+    platform: Optional[str] = None
+    location: Optional[str] = None
+    ip_address: Optional[str] = None
+    last_activity: datetime
+    created_at: datetime
+    is_current: bool = False
+
+    class Config:
+        from_attributes = True

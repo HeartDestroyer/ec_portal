@@ -21,7 +21,7 @@ const NotFound: React.FC = () => {
                 </span>
             }
             extra={
-                <Link to={APP_CONFIG.ROUTES.PRIVATE.DASHBOARD}>
+                <Link to={APP_CONFIG.ROUTES.PRIVATE.START}>
                     <Button 
                         size="large"
                         type="primary"

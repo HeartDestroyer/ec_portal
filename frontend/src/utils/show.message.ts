@@ -7,7 +7,7 @@
 
 import { message } from "antd";
 
-export function showBackendMessage(
+export function showMessage(
     response: any,
     type: 'success' | 'error' | 'info' | 'warning' = 'success',
     fallback?: string

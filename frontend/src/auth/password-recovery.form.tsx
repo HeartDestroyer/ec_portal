@@ -1,28 +1,32 @@
-import React from "react";
-import { Form, Input, Button, message, Flex } from "antd";
+import React, { useState } from "react";
+import { Form, Input, Button } from "antd";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { LockOutlined } from '@ant-design/icons';
 import { NewPasswordFormData } from "@/types/auth.types";
+import { authService } from "@/services/auth.service";
+import { APP_CONFIG, VALIDATION_CONFIG } from "@/config/app.config";
 
 const ResetPassword: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const [form] = Form.useForm<NewPasswordFormData>();
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     const token = searchParams.get('token');
     if (!token) {
-        navigate('/login');
+        navigate(APP_CONFIG.ROUTES.PUBLIC.LOGIN);
         return null;
     }
 
     const onFinish = async (values: NewPasswordFormData) => {
         try {
-            await setNewPassword({ ...values, token });
-            message.success(<span className="text-sm sm:text-base">Пароль успешно изменен</span>);
-            navigate('/login');
+            setIsSubmitting(true);
+            await authService.setNewPassword({ ...values, token });
+            navigate(APP_CONFIG.ROUTES.PUBLIC.LOGIN);
         } catch (error) {
-            const apiError = error as { message: string };
-            message.error(<span className="text-sm sm:text-base">{apiError.message}</span>);
+            console.error("Ошибка сброса пароля:", error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -30,30 +34,36 @@ const ResetPassword: React.FC = () => {
         <div className="flex justify-center items-center h-screen px-4">
             <Form<NewPasswordFormData>
                 form={form}
-                name="reset-password"
-                className="flex flex-col w-full max-w-md"
+                name="password"
+                className="w-full max-w-md"
                 onFinish={onFinish}
             >
-                <div className="mb-8 text-3xl sm:text-4xl font-bold text-center">Новый пароль</div>
+                <div className="mb-8 text-2xl sm:text-3xl font-bold text-center">Сброс пароля на {APP_CONFIG.NAME}е</div>
 
                 <Form.Item<NewPasswordFormData>
-                    name="password"
+                    name="new_password"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
-                        { min: 6, message: 'Пароль должен быть не менее 6 символов' }
+                        { required: true, message: 'Введите новый пароль' },
+                        { min: VALIDATION_CONFIG.PASSWORD.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.PASSWORD.MIN_LENGTH} символов` },
+                        { max: VALIDATION_CONFIG.PASSWORD.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.PASSWORD.MAX_LENGTH} символов` },
+                        { pattern: VALIDATION_CONFIG.PASSWORD.PATTERN, message: 'Пароль должен содержать заглавные и строчные буквы, цифры и специальные символы $!%*?&' }
                     ]}
                 >
-                    <Input.Password className="text-base sm:text-lg" prefix={<LockOutlined />} placeholder="Новый пароль" />
+                    <Input.Password 
+                        size="large" 
+                        prefix={<LockOutlined />} 
+                        placeholder="Новый пароль" 
+                    />
                 </Form.Item>
 
                 <Form.Item<NewPasswordFormData>
-                    name="confirmPassword"
-                    dependencies={['password']}
+                    name="confirm_password"
+                    dependencies={['new_password']}
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Повторите новый пароль' },
                         ({ getFieldValue }) => ({
                             validator(_, value) {
-                                if (!value || getFieldValue('password') === value) {
+                                if (!value || getFieldValue('new_password') === value) {
                                     return Promise.resolve();
                                 }
                                 return Promise.reject(new Error('Пароли не совпадают'));
@@ -61,21 +71,31 @@ const ResetPassword: React.FC = () => {
                         }),
                     ]}
                 >
-                    <Input.Password className="text-base sm:text-lg" prefix={<LockOutlined />} placeholder="Подтвердите пароль" />
+                    <Input.Password 
+                        size="large" 
+                        prefix={<LockOutlined />} 
+                        placeholder="Подтвердите пароль" 
+                    />
                 </Form.Item>
 
+                <div className="flex justify-between items-center mb-5 text-base">
+                    <span>Вспомнили пароль?</span>
+                    <Link to={APP_CONFIG.ROUTES.PUBLIC.LOGIN}>
+                        Вернуться к входу
+                    </Link>
+                </div>
+
                 <Form.Item>
-                    <Button className="text-lg h-10" block type="primary" htmlType="submit">
+                    <Button 
+                        size="large" 
+                        block 
+                        type="primary" 
+                        htmlType="submit"
+                        loading={isSubmitting}
+                        disabled={isSubmitting}
+                    >
                         Установить новый пароль
                     </Button>
-                </Form.Item>
-
-                <Form.Item>
-                    <Flex className="text-base sm:text-lg" justify="center" align="center">
-                        <Link to="/login" className="text-base sm:text-lg text-blue-400 hover:text-blue-700">
-                            Вернуться к входу
-                        </Link> 
-                    </Flex>
                 </Form.Item>
             </Form>
         </div>

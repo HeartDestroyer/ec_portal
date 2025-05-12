@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Form, Input, Button } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined, MailOutlined, LockOutlined, PhoneOutlined } from '@ant-design/icons';
@@ -10,35 +10,38 @@ const RegisterForm: React.FC = () => {
     const navigate = useNavigate();
     const { register } = useAuth();
     const [form] = Form.useForm<RegisterFormData>();
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     const onFinish = async (values: RegisterFormData) => {
         try {
+            setIsSubmitting(true);
             await register(values);
             navigate(APP_CONFIG.ROUTES.PUBLIC.LOGIN);
         } catch (error) {
             console.log("Ошибка регистрации", error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="flex justify-center items-center h-screen px-4">
+        <main className="min-h-screen flex flex-col justify-center items-center">
             <Form<RegisterFormData>
                 form={form}
-                name="register"
+                name="registerForm"
                 layout="vertical"
                 initialValues={{ remember: true }}
-                className="flex flex-col w-full max-w-md"
+                className="w-full max-w-md"
                 onFinish={onFinish}
                 validateTrigger={['onChange', 'onBlur']}
                 autoComplete="off"
             >
-                <div className="mb-8 text-3xl sm:text-4xl font-bold text-center">Регистрация на {APP_CONFIG.NAME}е</div>
+                <div className="mb-8 text-2xl sm:text-3xl font-bold text-center">Регистрация на {APP_CONFIG.NAME}е</div>
 
                 <Form.Item<RegisterFormData>
                     name="login"
-                    label="Логин"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректный логин' },
                         { min: VALIDATION_CONFIG.USERNAME.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.USERNAME.MIN_LENGTH} символов` },
                         { max: VALIDATION_CONFIG.USERNAME.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.USERNAME.MAX_LENGTH} символов` },
                     ]}
@@ -52,9 +55,8 @@ const RegisterForm: React.FC = () => {
 
                 <Form.Item<RegisterFormData>
                     name="name"
-                    label="Фамилия Имя"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректное имя' },
                         { min: VALIDATION_CONFIG.NAME.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.NAME.MIN_LENGTH} символов` },
                         { max: VALIDATION_CONFIG.NAME.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.NAME.MAX_LENGTH} символов` },
                     ]}
@@ -68,9 +70,8 @@ const RegisterForm: React.FC = () => {
 
                 <Form.Item<RegisterFormData>
                     name="phone"
-                    label="Телефон"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректный номер телефона' },
                         { pattern: VALIDATION_CONFIG.PHONE.PATTERN, message: 'Введите корректный номер телефона' }
                     ]}
                 >
@@ -83,10 +84,9 @@ const RegisterForm: React.FC = () => {
 
                 <Form.Item<RegisterFormData>
                     name="email"
-                    label="Почта"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
-                        { type: 'email', message: 'Введите корректный email' }
+                        { required: true, message: 'Введите корректную почту' },
+                        { type: 'email', message: 'Введите корректную почту' }
                     ]}
                 >
                     <Input 
@@ -98,22 +98,27 @@ const RegisterForm: React.FC = () => {
 
                 <Form.Item<RegisterFormData>
                     name="password" 
-                    label="Пароль"
                     dependencies={['password']}
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректный пароль' },
                         { min: VALIDATION_CONFIG.PASSWORD.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.PASSWORD.MIN_LENGTH} символов` },
                         { max: VALIDATION_CONFIG.PASSWORD.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.PASSWORD.MAX_LENGTH} символов` },
-                        { pattern: VALIDATION_CONFIG.PASSWORD.PATTERN, message: 'Пароль должен содержать заглавные и строчные буквы, цифры и специальные символы' }
+                        { pattern: VALIDATION_CONFIG.PASSWORD.PATTERN, message: 'Пароль должен содержать заглавные и строчные буквы, цифры и специальные символы $!%*?&' }
                     ]}
                 >
                     <Input.Password 
-                        className="text-base sm:text-lg" 
                         prefix={<LockOutlined />} 
                         placeholder="Пароль"
                         size="large"
                     />
                 </Form.Item>
+
+                <div className="flex justify-between items-center mb-5 text-base">
+                    <span>Уже есть аккаунт?</span>
+                    <Link to={APP_CONFIG.ROUTES.PUBLIC.LOGIN}>
+                        Вернуться к входу
+                    </Link>
+                </div>
 
                 <Form.Item>
                     <Button 
@@ -121,21 +126,14 @@ const RegisterForm: React.FC = () => {
                         htmlType="submit"
                         block
                         size="large"
+                        loading={isSubmitting}
+                        disabled={isSubmitting}
                     >
-                        Зарегистрироваться
+                        Зарегистрироваться на {APP_CONFIG.NAME}е
                     </Button>
                 </Form.Item>
-
-                <Form.Item>
-                    <div className="text-lg flex flex-row items-center justify-between">
-                        <div>Уже есть аккаунт?</div>
-                        <Link to={APP_CONFIG.ROUTES.PUBLIC.LOGIN}>
-                            Войти
-                        </Link> 
-                    </div>
-                </Form.Item>
             </Form>
-        </div>
+        </main>
     );
 };
 

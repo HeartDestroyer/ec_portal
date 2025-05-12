@@ -13,6 +13,11 @@ from core.config.config import BaseSettingsClass, settings
 class CSRFProtection:
     """
     Класс для защиты от CSRF атак
+
+    :`generate_token`: Генерация CSRF токена с временной меткой
+    :`verify_token`: Проверка CSRF токена
+    :`csrf_protect`: Декоратор для CSRF защиты с гибкими настройками
+    :`set_csrf_token_cookie`: Установка CSRF токена в cookie
     """
     def __init__(self, settings: BaseSettingsClass):
         self.settings = settings
@@ -21,11 +26,11 @@ class CSRFProtection:
         self.max_age_seconds = settings.CSRF_TOKEN_EXPIRE_MINUTES * 60
         self.csrf_cookie_name = settings.CSRF_COOKIE_NAME
 
-    # Генерация CSRF токена с временной меткой
+    # Генерация CSRF токена с временной меткой max_age_seconds
     def generate_token(self) -> str:
         """
-        Генерация CSRF токена с временной меткой
-        :return: CSRF токен
+        Генерация `CSRF` токена с временной меткой `max_age_seconds`
+        :return: `CSRF` токен
         """
         timestamp = str(int(time.time()))
         random_bytes = secrets.token_bytes(16)
@@ -37,8 +42,8 @@ class CSRFProtection:
     # Проверка CSRF токена
     def verify_token(self, token: str) -> bool:
         """
-        Проверка CSRF токена
-        :param token: CSRF токен
+        Проверка `CSRF` токена
+        :param token: `CSRF` токен
         :return: True если токен валиден иначе False
         """
         if not token:
@@ -71,7 +76,7 @@ class CSRFProtection:
         error_handler: Optional[Callable] = None
     ):
         """
-        Декоратор для CSRF защиты с гибкими настройками
+        Декоратор для `CSRF` защиты с гибкими настройками
         """
         excluded_paths = excluded_paths or []
         excluded_methods = excluded_methods or ['GET', 'HEAD', 'OPTIONS']
@@ -113,7 +118,7 @@ class CSRFProtection:
     async def set_csrf_token_cookie(self, response: Response, csrf_token: str) -> None:
         """
         Установка `CSRF` токена в cookie
-        :param response: Response объект
+        :param response: `Response` объект
         :param csrf_token: `CSRF` токен
         """
         response.set_cookie(
@@ -131,8 +136,8 @@ async def csrf_verify_header(
     request: Request,
 ):
     """
-    Проверяет CSRF токен в заголовке для методов, изменяющих состояние
-    :param request: Request объект
+    Проверяет `CSRF` токен в заголовке для методов, изменяющих состояние
+    :param request: `Request` объект
     """
     csrf_protect_methods = {"POST", "PUT", "DELETE", "PATCH"}
     if request.method not in csrf_protect_methods:
@@ -146,4 +151,3 @@ async def csrf_verify_header(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Отсутствует или неверный токен CSRF в заголовке"
         )
-

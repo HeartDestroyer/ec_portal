@@ -10,9 +10,9 @@ const theme = {
     token: {
         colorPrimary: '#0D3B66',
     },
-        Button: {
-            boxShadow: 'none',
-        },
+    Button: {
+        boxShadow: 'none',
+    },
 };
 
 interface ProtectedRouteProps {
@@ -26,8 +26,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
 
     if (isLoading) {
         return (
-            <div className="flex justify-center items-center h-screen">
-                <Spin size="large" tip="Загрузка..." />
+            <div className="flex flex-col items-center justify-center min-h-screen">
+                <Spin size="large" />
             </div>
         );
     }
@@ -38,7 +38,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
 
     if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
         message.error('У вас нет доступа к этой странице');
-        return <Navigate to={APP_CONFIG.ROUTES.PUBLIC.START} replace />;
+        return <Navigate to={APP_CONFIG.ROUTES.PRIVATE.START} state={{ from: location }} replace />;
     }
 
     return <>{children}</>;
@@ -60,19 +60,19 @@ const App: React.FC = () => {
                                 element={<ProtectedRoute allowedRoles={(route as any).allowedRoles}>{route.element}</ProtectedRoute>}
                             >
                                 {route.children && route.children.map((child) => (
-                                <Route
-                                    key={child.index ? 'index' : child.path}
-                                    index={child.index}
-                                    path={child.path}
-                                    element={
-                                        <ProtectedRoute allowedRoles={(child as any).allowedRoles}>
-                                            {child.element}
-                                        </ProtectedRoute>
-                                    }
-                                />
+                                    <Route
+                                        key={child.index ? 'index' : child.path}
+                                        index={child.index}
+                                        path={child.path}
+                                        element={
+                                            <ProtectedRoute allowedRoles={(child as any).allowedRoles}>
+                                                {child.element}
+                                            </ProtectedRoute>
+                                        }
+                                    />
                                 ))}
                             </Route>
-                            ))}
+                        ))}
                     </Routes>
                 </Router>
             </AuthProvider>

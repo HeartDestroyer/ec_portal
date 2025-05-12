@@ -8,6 +8,18 @@ import string
 from core.config.config import settings
 # Класс для работы с паролями
 class PasswordManager:
+    """
+    Класс для работы с паролями
+    
+    :`hash_password`: Хеширование пароля с использованием `bcrypt`
+    :`verify_password`: Проверка пароля на соответствие `hashed_password`
+    :`validate_password`: Валидация пароля по требованиям безопасности
+    :`generate_random_password`: Генерация случайного пароля
+    :`check_brute_force`: Проверка блокировки
+    :`handle_failed_login`: Обработка неудачных попыток входа
+    :`reset_failed_attempts`: Сброс неудачных попыток
+    """
+
     def __init__(self):
         self.pwd_context = CryptContext(
             schemes=["bcrypt"],
@@ -21,8 +33,8 @@ class PasswordManager:
     # Хеширование пароля с использованием bcrypt
     def hash_password(self, password: str) -> str:
         """
-        Хеширование пароля с использованием bcrypt
-        :param password: Пароль в виде строки
+        Хеширование пароля с использованием `bcrypt`
+        :param `password`: Пароль в виде строки
         :return: Хешированный пароль
         """
         return self.pwd_context.hash(password)
@@ -30,9 +42,9 @@ class PasswordManager:
     # Проверка пароля
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
-        Проверка пароля
-        :param plain_password: Пароль в виде строки
-        :param hashed_password: Хешированный пароль
+        Проверка password на соответствие hashed_password
+        :param `plain_password`: Пароль в виде строки
+        :param `hashed_password`: Хешированный пароль
         :return: True, если пароль верный, иначе False
         """
         return self.pwd_context.verify(plain_password, hashed_password)
@@ -41,6 +53,8 @@ class PasswordManager:
     def validate_password(self, password: str) -> tuple[bool, list[str]]:
         """
         Расширенная валидация пароля с оценкой сложности
+        :param `password`: Пароль в виде строки
+        :return: Кортеж из булева значения и списка ошибок
         """
         errors = []
         
@@ -65,7 +79,7 @@ class PasswordManager:
     def generate_random_password(self, length: int = 12) -> str:
         """
         Генерация случайного пароля
-        :param length: Длина пароля
+        :param `length`: Длина пароля
         :return: Случайный пароль
         """
         return ''.join(random.choices(string.ascii_letters + string.digits + string.punctuation, k=length))
@@ -74,7 +88,7 @@ class PasswordManager:
     async def check_brute_force(self, user) -> bool:
         """
         Проверка блокировки
-        :param user: Пользователь
+        :param `user`: Пользователь
         :return: True, если пользователь заблокирован, иначе False
         """
         if user.locked_until and user.locked_until > datetime.utcnow():
@@ -85,7 +99,7 @@ class PasswordManager:
     async def handle_failed_login(self, user) -> None:
         """
         Обработка неудачных попыток входа
-        :param user: Пользователь
+        :param `user`: Пользователь
         """
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= self.max_failed_attempts:
@@ -95,7 +109,7 @@ class PasswordManager:
     async def reset_failed_attempts(self, user) -> None:
         """
         Сброс неудачных попыток
-        :param user: Пользователь
+        :param `user`: Пользователь
         """
         user.failed_login_attempts = 0
         user.locked_until = None

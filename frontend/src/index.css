@@ -84,7 +84,7 @@ h1 {
 	color: #fff !important;
 }
 .ant-menu-inline.ant-menu-root .ant-menu-item {
-    transition: border-color 0.1s, background 0.1s !important;
+    transition: border-color 0.1s, background 0.1s, color 0.1s !important;
 }
 .ant-menu .ant-menu-item .anticon +span{
 	transition: color 0.1s !important;

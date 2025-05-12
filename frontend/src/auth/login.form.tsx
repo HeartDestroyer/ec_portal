@@ -12,7 +12,7 @@ const LoginForm: React.FC = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
     const [form] = Form.useForm<LoginFormData>();
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
     const onFinish = async (values: LoginFormData) => {
         try {
@@ -39,12 +39,12 @@ const LoginForm: React.FC = () => {
                 validateTrigger={['onChange', 'onBlur']}
                 autoComplete="off"
             >
-                <div className="mb-8 text-3xl sm:text-4xl font-bold text-center">{APP_CONFIG.NAME}</div>
+                <div className="mb-8 text-2xl sm:text-3xl font-bold text-center">{APP_CONFIG.NAME}</div>
 
                 <Form.Item<LoginFormData>
                     name="login_or_email"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректный логин или почту' },
                         { min: VALIDATION_CONFIG.USERNAME.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.USERNAME.MIN_LENGTH} символов` },
                         { max: VALIDATION_CONFIG.USERNAME.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.USERNAME.MAX_LENGTH} символов` },
                     ]}
@@ -59,25 +59,24 @@ const LoginForm: React.FC = () => {
                 <Form.Item<LoginFormData>
                     name="password"
                     rules={[
-                        { required: true, message: 'Обязательное поле' },
+                        { required: true, message: 'Введите корректный пароль' },
                         { min: VALIDATION_CONFIG.PASSWORD.MIN_LENGTH, message: `Минимальная длина ${VALIDATION_CONFIG.PASSWORD.MIN_LENGTH} символов` },
                         { max: VALIDATION_CONFIG.PASSWORD.MAX_LENGTH, message: `Максимальная длина ${VALIDATION_CONFIG.PASSWORD.MAX_LENGTH} символов` },
-                        { pattern: VALIDATION_CONFIG.PASSWORD.PATTERN, message: 'Пароль должен содержать заглавные и строчные буквы, цифры и специальные символы' }
+                        { pattern: VALIDATION_CONFIG.PASSWORD.PATTERN, message: 'Пароль должен содержать заглавные и строчные буквы, цифры и специальные символы $!%*?&' }
                     ]}
                 >
                     <Input.Password 
-                        className="text-base sm:text-lg" 
                         prefix={<LockOutlined />} 
                         placeholder="Пароль"
                         size="large"
                     />
                 </Form.Item>
 
-                <div className="flex justify-between items-center mb-4">
-                    <Link to={APP_CONFIG.ROUTES.PUBLIC.RESET_PASSWORD} className="text-lg">
+                <div className="flex justify-between items-center mb-5 text-base">
+                    <Link to={APP_CONFIG.ROUTES.PUBLIC.RESET_PASSWORD}>
                         Забыли пароль?
                     </Link>
-                    <Link to={APP_CONFIG.ROUTES.PUBLIC.REGISTER} className="text-lg">
+                    <Link to={APP_CONFIG.ROUTES.PUBLIC.REGISTER}>
                         Зарегистрироваться
                     </Link>
                 </div>

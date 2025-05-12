@@ -7,62 +7,36 @@ import { RouteObject } from 'react-router-dom';
 import { APP_CONFIG } from '../config/app.config';
 import { ROLES } from '@/config/roles.config';
 
-// Страницы для авторизации
-import LoginForm from '../auth/login.form';
-import RegisterForm from '../auth/register.form';
-import ResetPassword from '../auth/password-recovery.form';
-import VerifyEmailPage from '../auth/verify-email.pages';
+import LoginForm from '../auth/login.form'; /** Страница для авторизации */
+import RegisterForm from '../auth/register.form'; /** Страница для регистрации */
+import ResetPassword from '../auth/reset-password.form'; /** Страница для сброса пароля */
+import NewPassword from '../auth/password-recovery.form'; /** Страница для сброса пароля */
+import VerifyEmailPage from '../auth/verify-email.pages'; /** Страница для подтверждения email */
+import NotFound from '../technical/404.component'; /** Страницы для 404 ошибки */
+import HomeRoute from '../components/home.route'; /** Домашняя страница */
 
-import HomeRoute from '../components/home.route';
-import NotFound from '../technical/404.component';
-import DashboardLayout from '@/technical/layout.page';
-
-// Страницы для административных маршрутов
-const AdminPanelPage = lazy(() => import('../admin_panel/admin_panel.page'));
-
-// Страницы для профиля пользователя
-const DashboardPage = lazy(() => import('../components/dashboard.page'));
-const ProfilePage = lazy(() => import('../profile/components/info.page'));
-const AchievementsPage = lazy(() => import('../profile/components/achievements.page'));
-const LetterPage = lazy(() => import('../profile/components/letter.page'));
-
-// Страницы для организаций
-const EmployeesPage = lazy(() => import('../organizations/components/employees.page'));
-const CompanyStructurePage = lazy(() => import('../organizations/components/company_structure.page'));
-
-// Страницы для видео уроков
-const VideoLessonsPage = lazy(() => import('../video_lessons/components/video_lessons.page'));
-const LeaderLessonsPage = lazy(() => import('../video_lessons/components/leader.page'));
-const MasterClassPage = lazy(() => import('../video_lessons/components/master_class.page'));
-const CheckListPage = lazy(() => import('../video_lessons/components/check_list.page'));
-
-// Страницы для HR тестирования
-const HrPage = lazy(() => import('../candidates/components/hr.page'));
-
-// Страницы для презентации
-const PresentationPage = lazy(() => import('../presentation/components/presentation.page'));
-
-// Страницы для возражений о неоплате
-const ObjectionsPage = lazy(() => import('../objection/components/objection.page'));
-
-// Страницы для отзывов клиентов
-const CustomerReviewsPage = lazy(() => import('../tools_and_assistants/components/customer_reviews.page'));
-
-// Страницы для калькулятора ОТС
-const CalculatorOtsPage = lazy(() => import('../tools_and_assistants/components/calculator.page'));
-
-// Страницы для справочника
-const ResponsiblePage = lazy(() => import('../tools_and_assistants/components/responsible.page'));
-
-// Страницы для аудио возражений о неоплате
-const AudioObjectionsPage = lazy(() => import('../tools_and_assistants/components/audio_objections.page'));
-
-// Страницы для онлайн магазина
-const OnlineStorePage = lazy(() => import('../online_store/components/online_store.page'));
-
-// Страницы для настроек
-const SettingsPage = lazy(() => import('../settings/components/settings.page'));
-
+const DashboardLayout = lazy(() => import('@/technical/layout.page')); /** Страница для шаблона */
+const AdminPanelPage = lazy(() => import('../admin_panel/admin_panel.page')); /** Страница для админ панели */
+const DashboardPage = lazy(() => import('../components/dashboard.page')); /** Страница для главного экрана */
+const ProfilePage = lazy(() => import('../profile/components/info.page')); /** Страница для профиля пользователя */
+const AchievementsPage = lazy(() => import('../profile/components/achievements.page')); /** Страница для достижений */
+const LetterPage = lazy(() => import('../profile/components/letter.page')); /** Страница для шаблонов письма */
+const EmployeesPage = lazy(() => import('../organizations/components/employees.page')); /** Страница для сотрудников */
+const CompanyStructurePage = lazy(() => import('../organizations/components/company_structure.page')); /** Страница для структуры компании */
+const VideoLessonsPage = lazy(() => import('../video_lessons/components/video_lessons.page')); /** Страница для видеоуроков новичков */
+const LeaderLessonsPage = lazy(() => import('../video_lessons/components/leader.page')); /** Страница для видеоуроков лидеров */
+const MasterClassPage = lazy(() => import('../video_lessons/components/master_class.page')); /** Страница для мастер класса */
+const CheckListPage = lazy(() => import('../video_lessons/components/check_list.page')); /** Страница для чек листа */
+const HrPage = lazy(() => import('../candidates/components/hr.page')); /** Страница для HR тестирования */
+const PresentationPage = lazy(() => import('../presentation/components/presentation.page')); /** Страница для презентации партнеров */
+const ObjectionsPage = lazy(() => import('../objection/components/objection.page')); /** Страница для возражений о неоплате */
+const CustomerReviewsPage = lazy(() => import('../tools_and_assistants/components/customer_reviews.page')); /** Страница для отзывов клиентов */
+const CalculatorOtsPage = lazy(() => import('../tools_and_assistants/components/calculator.page')); /** Страница для калькулятора ОТС */
+const ResponsiblePage = lazy(() => import('../tools_and_assistants/components/responsible.page')); /** Страницы для справочника */
+const AudioObjectionsPage = lazy(() => import('../tools_and_assistants/components/audio_objections.page')); /** Страница для аудио возражений о неоплате */
+const OnlineStorePage = lazy(() => import('../online_store/components/online_store.page')); /** Страница для онлайн магазина */
+const SettingsPage = lazy(() => import('../settings/components/settings.page')); /** Страница для настроек */
+const SessionsPage = lazy(() => import('../components/sessions.page')); /** Страница для сессий */
 
 export const publicRoutes: RouteObject[] = [
     {
@@ -84,6 +58,10 @@ export const publicRoutes: RouteObject[] = [
     {
         path: APP_CONFIG.ROUTES.PUBLIC.RESET_PASSWORD,
         element: <ResetPassword />
+    },
+    {
+        path: APP_CONFIG.ROUTES.PUBLIC.PASSWORD_RECOVERY,
+        element: <NewPassword />
     },
     {
         path: '*',
@@ -194,6 +172,11 @@ export const protectedRoutes: RouteObject[] = [
             {
                 path: APP_CONFIG.ROUTES.PRIVATE.SETTINGS,
                 element: <SettingsPage />,
+                allowedRoles: ROLES.ALL
+            } as any,
+            {
+                path: APP_CONFIG.ROUTES.PRIVATE.SESSIONS,
+                element: <SessionsPage />,
                 allowedRoles: ROLES.ALL
             } as any,
         ]   

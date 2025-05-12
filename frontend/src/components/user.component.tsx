@@ -1,9 +1,10 @@
 // Компонент для отображения пользователя
 // Отображается в правой части шапки
 
-import { Dropdown, Menu, Avatar } from 'antd';
-import { UserOutlined, LogoutOutlined, FullscreenOutlined } from '@ant-design/icons';
-import { useAuth } from '@/context/auth.context';
+import { Dropdown, Avatar } from 'antd';
+import { UserOutlined, LogoutOutlined, FullscreenOutlined, ProfileOutlined, UnlockOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { APP_CONFIG } from '@/config/app.config';
 
 interface UserComponentProps {
     enterFullscreen: () => void;
@@ -11,29 +12,49 @@ interface UserComponentProps {
 }
 
 const UserComponent: React.FC<UserComponentProps> = ({ enterFullscreen, logout }) => {
-    const { user } = useAuth();
+    const navigate = useNavigate();
 
-    const userMenu = (
-        <Menu>
-            <div className="flex flex-col p-2">
-                <span className="text-sm sm:text-base">Логин: {user?.login}</span>
-                <span className="text-sm sm:text-base">Телефон: {user?.phone}</span>
-                <span className="text-sm sm:text-base">Почта: {user?.email}</span>
-            </div>
-            <Menu.Divider />
-            <Menu.Item key="fullscreen" onClick={enterFullscreen} icon={<FullscreenOutlined />}>
-                <span className="text-sm sm:text-base">На весь экран</span>
-            </Menu.Item>
-            <Menu.Item key="logout" onClick={logout} icon={<LogoutOutlined />} danger={true}>
-                <span className="text-sm sm:text-base">Выйти</span>
-            </Menu.Item>
-        </Menu>
-    );
+    const userMenu = [
+        {
+            key: 'profile',
+            icon: <ProfileOutlined />,
+            label: <span className="text-sm sm:text-base">Перейти в профиль</span>,
+            onClick: () => { navigate(APP_CONFIG.ROUTES.PRIVATE.PROFILE);}
+        },
+        {
+            type: 'divider' as const
+        },
+        {
+            key: 'sessions',
+            icon: <UnlockOutlined />,
+            label: <span className="text-sm sm:text-base">Управление сессиями</span>,
+            onClick: () => { navigate(APP_CONFIG.ROUTES.PRIVATE.SESSIONS);}
+        },
+        {
+            type: 'divider' as const
+        },
+        {
+            key: 'fullscreen',
+            icon: <FullscreenOutlined />,
+            label: <span className="text-sm sm:text-base">На весь экран</span>,
+            onClick: enterFullscreen
+        },
+        {
+            type: 'divider' as const
+        },
+        {
+            key: 'logout',
+            icon: <LogoutOutlined />,
+            label: <span className="text-sm sm:text-base">Выйти из аккаунта</span>,
+            danger: true,
+            onClick: logout
+        }
+    ];
 
     return (
-        <Dropdown overlay={userMenu} trigger={['click']}>
+        <Dropdown menu={{ items: userMenu }} trigger={['click']}>
             <Avatar 
-                className="cursor-pointer bg-[#0D3B66] select-none"
+                className="cursor-pointer select-none"
                 icon={<UserOutlined />}
                 size="large"
             />

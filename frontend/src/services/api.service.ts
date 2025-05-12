@@ -6,7 +6,7 @@
  */
 
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { API_CONFIG, APP_CONFIG } from '@/config/app.config';
+import { API_CONFIG } from '@/config/app.config';
 
 class ApiService {
     private instance: AxiosInstance;
@@ -28,7 +28,7 @@ class ApiService {
                 const isAuthRequest =
                     originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.LOGIN) ||
                     originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
-                
+
                 if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
                     originalRequest._retry = true;
                     try {
@@ -36,7 +36,7 @@ class ApiService {
                         await this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
                         return this.instance(originalRequest);
                     } catch (refreshError) {
-                        // window.location.href = APP_CONFIG.ROUTES.PUBLIC.LOGIN;
+                        
                     }
                 }
                 return Promise.reject(error);

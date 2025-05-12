@@ -1,11 +1,11 @@
 // frontend/src/components/layout/SidebarMenu.tsx
 
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, Button, Badge } from 'antd';
 import { DashboardOutlined, UserOutlined, ThunderboltOutlined, 
-    ShoppingOutlined, StarOutlined, SettingOutlined, TeamOutlined, 
-    VideoCameraOutlined, LeftOutlined, RightOutlined, BookOutlined, ApartmentOutlined } from '@ant-design/icons';
+    ShoppingOutlined, StarOutlined, SettingOutlined, 
+    VideoCameraOutlined, LeftOutlined, RightOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/auth.context';
 import { cache } from '@/services/cache.service';
@@ -35,11 +35,6 @@ interface MenuItem {
     children?: MenuItem[];
     badge?: number;
 }
-
-const DEPARTMENTS = {
-    HR: [1] as DepartmentType[],
-    OTS: [7] as DepartmentType[],
-} as const;
 
 const NO_NAVIGATE_KEYS = ['cache_reset'];
 
@@ -205,9 +200,11 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
     const filteredMenuItems = useMemo(() => {
         const filterMenuItem = (item: MenuItem): boolean => {
             const hasRequiredRole = !item.roles || 
-                (user?.role && item.roles.includes(user.role as RoleType));
-            const hasRequiredDepartment = !item.departments || 
-                (user?.department_id && item.departments.includes(user.department_id as DepartmentType));
+                Boolean(user?.role && item.roles.includes(user.role as RoleType));
+            
+            const hasRequiredDepartment = item.departments 
+                ? Boolean(user?.department_id && item.departments.includes(user.department_id as DepartmentType))
+                : true;
             
             return hasRequiredRole && hasRequiredDepartment;
         };

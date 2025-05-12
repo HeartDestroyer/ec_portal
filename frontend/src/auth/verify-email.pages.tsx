@@ -15,7 +15,7 @@ const VerifyEmailPage: React.FC = () => {
     const verifyEmail = useCallback(async (token: string) => {
         try {
             await authService.verifyEmail(token);
-            setTimeout(() => navigate(APP_CONFIG.ROUTES.PUBLIC.LOGIN), 3000);
+            setTimeout(() => navigate(APP_CONFIG.ROUTES.PUBLIC.LOGIN), 2000);
         } catch (error: any) {
             console.error("Ошибка подтверждения email:", error);
         }
@@ -23,10 +23,7 @@ const VerifyEmailPage: React.FC = () => {
 
     useEffect(() => {
         const token = searchParams.get("token");
-        if (!token) {
-            return;
-        }
-
+        if (!token) { return; }
         verifyEmail(token);
     }, [verifyEmail, searchParams]);
 

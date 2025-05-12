@@ -5,17 +5,17 @@
 
 import { apiService } from './api.service';
 import { API_CONFIG } from '@/config/app.config';
-import { showBackendMessage } from '@/utils/show.message';
+import { showMessage } from '@/utils/show.message';
 
 class CacheService {
     // Сброс кэша
     async clear() {
         try {
             const response = await apiService.post(API_CONFIG.ENDPOINTS.CACHE.CLEAR);
-            showBackendMessage(response, 'success');
+            showMessage(response, 'success');
             return response.data;
         } catch (error) {
-            showBackendMessage(error, 'error');
+            showMessage(error, 'error');
             throw error;
         }
     }

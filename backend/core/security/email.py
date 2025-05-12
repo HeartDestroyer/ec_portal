@@ -15,6 +15,12 @@ import uuid
 class EmailManager:
     """
     Менеджер для отправки email с использованием шаблонов
+    
+    :`verify_token`: Проверяет JWT токен для email верификации/сброса пароля
+    :`send_verification_email`: Отправляет email для подтверждения
+    :`send_password_reset_email`: Отправляет email для сброса пароля
+    :`send_welcome_email`: Отправляет приветственное письмо новому пользователю
+    :`send_notification_email`: Отправляет уведомление пользователю 
     """
     def __init__(self):
         """
@@ -56,12 +62,12 @@ class EmailManager:
         """
         Базовый метод для отправки email с использованием шаблона
         
-        :param email_to: `email` получателя
-        :param subject: Тема письма
-        :param template_name: Имя файла шаблона
-        :param template_data: Данные для шаблона
-        :param cc: Список адресов для копии
-        :return: bool: `True` если отправка успешна, `False` в случае ошибки
+        :param `email_to`: `email` получателя
+        :param `subject`: Тема письма
+        :param `template_name`: Имя файла шаблона
+        :param `template_data`: Данные для шаблона
+        :param `cc`: Список адресов для копии
+        :return: `bool`: `True` если отправка успешна, `False` в случае ошибки
         """
         try:
             # Получаем шаблон и рендерим его
@@ -93,9 +99,9 @@ class EmailManager:
     def _create_token(self, data: Dict[str, Any], expires_delta: timedelta) -> str:
         """
         Создает подписанный `JWT` токен для `email` верификации/сброса пароля
-        :param data: Данные для токена
-        :param expires_delta: Срок действия токена
-        :return: str: Подписанный JWT токен
+        :param `data`: Данные для токена
+        :param `expires_delta`: Срок действия токена
+        :return: `str`: Подписанный JWT токен
         """
         to_encode = data.copy()
         expire = datetime.utcnow() + expires_delta
@@ -112,8 +118,8 @@ class EmailManager:
         """
         Проверяет `JWT` токен для `email` верификации/сброса пароля
         
-        :param token: JWT токен для проверки
-        :param token_type: Тип токена (`email_verification` или `password_reset`)
+        :param `token`: JWT токен для проверки
+        :param `token_type`: Тип токена (`email_verification` или `password_reset`)
         :return: Optional[Dict]: Данные из токена или `None` если токен невалиден
         """
         try:
@@ -133,18 +139,18 @@ class EmailManager:
             return None
 
 
-    # Отправляет email для подтверждения адреса
+    # Отправляет email для подтверждения
     async def send_verification_email(self, email: EmailStr, user_id: uuid.UUID) -> bool:
         """
-        Отправляет `email` для подтверждения адреса
+        Отправляет `email` для подтверждения
         
-        :param email: `email` пользователя
-        :param user_id: ID пользователя
-        :return: bool: True если отправка успешна
+        :param `email`: `email` пользователя
+        :param `user_id`: ID пользователя
+        :return: `bool`: True если отправка успешна
         """
         # Создаем токен для верификации
         token = self._create_token(
-            {"sub": str(user_id), "type": "email_verification"},
+            {"id": str(user_id), "type": "email_verification"},
             timedelta(hours=24)
         )
 
@@ -154,7 +160,7 @@ class EmailManager:
         # Отправляем email
         return await self._send_email(
             email_to=email,
-            subject="Подтверждение email адреса",
+            subject=f"Подтверждение email адреса на {settings.PROJECT_NAME}е",
             template_name=self.verify_email_template,
             template_data={
                 "verification_url": verification_url,
@@ -175,17 +181,17 @@ class EmailManager:
         """
         # Создаем токен для сброса пароля
         token = self._create_token(
-            {"sub": str(user_id), "type": "password_reset"},
+            {"id": str(user_id), "type": "password_reset"},
             timedelta(hours=1)
         )
 
         # Формируем URL для сброса пароля
-        reset_url = f"{settings.FRONTEND_URL}/api/v1/auth/reset-password?token={token}"
+        reset_url = f"{settings.FRONTEND_URL}/password-recovery?token={token}"
 
         # Отправляем email
         return await self._send_email(
             email_to=email,
-            subject="Сброс пароля",
+            subject=f"Сброс пароля на {settings.PROJECT_NAME}е",
             template_name=self.reset_password_template,
             template_data={
                 "reset_url": reset_url,
@@ -205,7 +211,7 @@ class EmailManager:
         """
         return await self._send_email(
             email_to=email,
-            subject=f"Добро пожаловать в {settings.PROJECT_NAME}!",
+            subject=f"Добро пожаловать в {settings.PROJECT_NAME}",
             template_name=self.welcome_email_template,
             template_data={
                 "username": username,

@@ -12,7 +12,8 @@ const LogoutButton: React.FC<LogoutButtonProps> = ({ onLogout }) => {
             type="text"
             icon={<LogoutOutlined />}
             onClick={onLogout}
-            className="text-base"
+            size="large"
+            danger
         >
             Выйти
         </Button>

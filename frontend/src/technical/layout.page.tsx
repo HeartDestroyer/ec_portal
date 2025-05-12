@@ -11,7 +11,7 @@ const { Content } = Layout;
 
 const DashboardLayout: React.FC = () => {
     const [collapsed, setCollapsed] = useState<boolean>(false); // Состояние меню
-    const [isFullscreen, setIsFullscreen] = useState<boolean>(false); // Состояние полноэкранного режима
+    const [, setIsFullscreen] = useState<boolean>(false); // Состояние полноэкранного режима
     const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false); // Состояние мобильного меню
     const location = useLocation();
 

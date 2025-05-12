@@ -1,15 +1,5 @@
 /**
  * Конфигурация приложения
- * Содержит базовые настройки API:
- * - Адрес бэкенда
- * - Пути API эндпоинтов
- * - Ключи для хранения токенов
- * Настройки приложения:
- * - Имя приложения
- * - Версия приложения
- * - Ключи для хранения пользователя в localStorage
- * - Пути маршрутизации
- * - Правила валидации
  */
 
 import { RoutePaths } from '@/types/routes.types';
@@ -27,6 +17,7 @@ export const API_CONFIG = {
             VERIFY_EMAIL: '/api/v1/auth/verify-email',
             RESEND_VERIFICATION: '/api/v1/auth/resend-verification',
             CSRF: '/api/v1/auth/csrf',
+            SESSIONS: '/api/v1/auth/sessions',
         },
         USER: {
             INFO: '/api/v1/auth/me',
@@ -71,6 +62,7 @@ export const APP_CONFIG = {
             AUDIO_OBJECTIONS: '/audio-objections',
             SHOP: '/shop',
             SETTINGS: '/settings',
+            SESSIONS: '/sessions',
         } as RoutePaths['PRIVATE'],
     },
 } as const;

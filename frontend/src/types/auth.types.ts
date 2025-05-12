@@ -1,4 +1,3 @@
-
 /**
  * Типы для работы с пользователями
  * Содержит типы для работы с пользователями
@@ -14,6 +13,7 @@ export interface User {
     additional_role: string;
     is_active: boolean;
     is_verified: boolean;
+    department_id: number;
 
     gender: string;
     company: string;
@@ -43,16 +43,18 @@ export interface RegisterFormData {
 export interface NewPasswordFormData {
     token: string;
     new_password: string;
-}
-
-export interface RegisterFormData {
-    login: string;
-    email: string;
-    password: string;
-    name: string;
-    phone: string;
+    confirm_password: string;
 }
 
 export interface ResetPasswordFormData {
     email: string;
+}
+
+export interface Session {
+    id: string;
+    device: string;
+    browser: string;
+    ip: string;
+    last_activity: string;
+    is_current: boolean;
 }

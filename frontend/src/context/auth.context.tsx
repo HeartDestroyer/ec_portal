@@ -39,6 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // Загружаем данные только при первом рендере
     useEffect(() => {
         loadUserData();
     }, []);
@@ -61,15 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return (
         <AuthContext.Provider
-            value={{
-                isAuthenticated,
-                isLoading,
-                user,
-                login: handleLogin,
-                register: handleRegister,
-                logout: handleLogout,
-                loadUserData,
-            }}
+            value={{ isAuthenticated, isLoading, user, login: handleLogin, register: handleRegister, logout: handleLogout, loadUserData }}
         >
             {children}
         </AuthContext.Provider>

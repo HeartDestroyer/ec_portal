@@ -4,6 +4,7 @@ from .base import Base
 from .user import User, Role, AdditionalRole, Gender, Company, City
 from .department import Department
 from .group import Group
+from .session import Session
 
 __all__ = [
     'Base',
@@ -14,5 +15,6 @@ __all__ = [
     'Company',
     'City',
     'Department',
-    'Group'
-] 
+    'Group',
+    'Session'
+]
