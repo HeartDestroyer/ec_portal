@@ -3,18 +3,17 @@
 from fastapi import APIRouter, Depends, Response, Request, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from core.extensions.logger import logger
-import uuid
 
 # Схемы
 from .schemas import (
     UserCreate, UserLogin, UserPrivateProfile, MessageResponse, RequestPasswordReset, 
-    ResetPassword, CSRFTokenResponse, SessionResponse
+    ResetPassword, CSRFTokenResponse
 )
 
 # Сервисы и зависимости
-from .services import AuthenticationService, SessionService
+from .services import AuthenticationService
 from api.v1.dependencies import (
     get_db, get_redis, get_current_active_user, settings, get_current_user_payload
 )
@@ -126,8 +125,15 @@ async def refresh_tokens_endpoint(
     
     except HTTPException as err:
         if err.status_code == status.HTTP_401_UNAUTHORIZED:
-             response.delete_cookie(
+            response.delete_cookie(
                 key=jwt_handler.refresh_cookie_name,
+                path="/api",
+                secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
+                httponly=True,
+                samesite="lax"
+            )
+            response.delete_cookie(
+                key=jwt_handler.access_cookie_name,
                 path="/api",
                 secure=settings.SESSION_COOKIE_SECURE if hasattr(settings, 'SESSION_COOKIE_SECURE') else True,
                 httponly=True,
@@ -148,8 +154,7 @@ async def refresh_tokens_endpoint(
 async def logout_endpoint(
     response: Response,
     redis: Redis = Depends(get_redis),
-    # Пытаемся получить payload, но не выбрасываем ошибку, если токен невалиден
-    payload: Optional[Dict[str, Any]] = Depends(get_current_user_payload),
+    payload: Optional[Dict[str, Any]] = Depends(get_current_user_payload), # Пытаемся получить payload, но не выбрасываем ошибку, если токен невалиден
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -222,7 +227,6 @@ async def request_password_reset_endpoint(
     if not email_manager:
         raise HTTPException(status_code=503, detail="Сервис email временно недоступен")
 
-    # Используем None для Redis и JWT, т.к. они не нужны здесь
     auth_service = AuthenticationService(db, None, None, email_manager)
     await auth_service.request_password_reset_service(data.email)
     return MessageResponse(message="Если почта зарегистрирована, ссылка для сброса пароля будет отправлена")
@@ -327,178 +331,3 @@ async def get_csrf_token(response: Response):
     csrf_token = csrf_handler.generate_token()
     await csrf_handler.set_csrf_token_cookie(response, csrf_token)
     return CSRFTokenResponse(csrf_token=csrf_token)
-
-# Получение активных сессий
-@auth_router.get(
-    "/sessions",
-    response_model=List[SessionResponse],
-    summary="Получение списка активных сессий пользователя"
-)
-async def get_sessions(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """
-    Получение списка активных сессий пользователя\n
-    Требуется валидный `refresh_token` в куки
-    """
-    jwt_handler = JWTHandler(settings)
-    refresh_token = request.cookies.get(jwt_handler.refresh_cookie_name)
-    if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh токен отсутствует"
-        )
-
-    try:
-        payload = await jwt_handler.verify_token(refresh_token, "refresh", redis)
-        user_id = payload.get("id")
-        session_id = payload.get("session_id")
-
-        if not user_id or not session_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Невалидный refresh токен"
-            )
-
-        # Проверяем валидность сессии
-        session_service = SessionService(db, jwt_handler)
-        if not await session_service.check_session_validity(str(session_id)):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Сессия истекла или неактивна"
-            )
-
-        sessions = await session_service.get_user_sessions(user_id, session_id)
-        return sessions
-
-    except HTTPException as err:
-        raise err
-    except Exception as err:
-        logger.error(f"Ошибка при получении списка сессий: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при получении списка сессий"
-        )
-
-# Завершение конкретной сессии
-@auth_router.delete(
-    "/sessions/{session_id}",
-    response_model=MessageResponse,
-    summary="Завершение конкретной сессии"
-)
-async def deactivate_session(
-    session_id: str,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """ 
-    Завершение конкретной сессии пользователя по ID сессии `session_id`.
-    Требуется валидный `refresh_token` в куки
-    """
-    try:
-        # Проверяем, что session_id является валидным UUID
-        uuid.UUID(session_id)
-        
-        jwt_handler = JWTHandler(settings)
-        refresh_token = request.cookies.get(jwt_handler.refresh_cookie_name)
-        if not refresh_token:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Refresh токен отсутствует"
-            )
-
-        # Проверяем refresh токен
-        payload = await jwt_handler.verify_token(refresh_token, "refresh", redis)
-        user_id = payload.get("id")
-        current_session_id = payload.get("session_id")
-
-        if not user_id or not current_session_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Невалидный refresh токен"
-            )
-
-        # Проверяем валидность текущей сессии
-        session_service = SessionService(db, jwt_handler)
-        if not await session_service.check_session_validity(current_session_id):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Текущая сессия истекла или неактивна"
-            )
-
-        # Деактивируем указанную сессию
-        await session_service.deactivate_session(session_id, user_id)
-        return MessageResponse(message="Сессия успешно завершена")
-
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Неверный формат ID сессии"
-        )
-    except HTTPException as err:
-        raise err
-    except Exception as err:
-        logger.error(f"Ошибка при завершении сессии: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при завершении сессии"
-        )
-
-# Завершение всех других сессий, кроме текущей
-@auth_router.delete(
-    "/sessions",
-    response_model=MessageResponse,
-    summary="Завершение всех других сессий, кроме текущей"
-)
-async def terminate_other_sessions(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-):
-    """
-    Завершение всех сессий пользователя кроме текущей.
-    Требуется валидный `refresh_token` в куки
-    """
-    jwt_handler = JWTHandler(settings)
-    refresh_token = request.cookies.get(jwt_handler.refresh_cookie_name)
-    if not refresh_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh токен отсутствует"
-        )
-
-    try:
-        # Проверяем refresh токен
-        payload = await jwt_handler.verify_token(refresh_token, "refresh", redis)
-        user_id = payload.get("id")
-        current_session_id = payload.get("session_id")
-
-        if not user_id or not current_session_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Невалидный refresh токен"
-            )
-
-        # Проверяем валидность текущей сессии
-        session_service = SessionService(db, jwt_handler)
-        if not await session_service.check_session_validity(current_session_id):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Текущая сессия истекла или неактивна"
-            )
-
-        # Завершаем все остальные сессии
-        await session_service.terminate_other_sessions(current_session_id, user_id)
-        return MessageResponse(message="Все остальные сессии успешно завершены")
-
-    except HTTPException as err:
-        raise err
-    except Exception as err:
-        logger.error(f"Ошибка при завершении других сессий: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при завершении других сессий"
-        )

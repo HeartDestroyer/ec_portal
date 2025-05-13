@@ -24,6 +24,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
     const { isAuthenticated, isLoading, user } = useAuth();
     const location = useLocation();
 
+    /** Загружаем данные пользователя */
     if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen">
@@ -32,10 +33,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         );
     }
 
+    /** Если пользователь не авторизован, перенаправляем на страницу авторизации */
     if (!isAuthenticated) {
         return <Navigate to={APP_CONFIG.ROUTES.PUBLIC.LOGIN} state={{ from: location }} replace />;
     }
 
+    /** Если у пользователя нет доступа к странице, перенаправляем на главную страницу */
     if (allowedRoles && (!user || !allowedRoles.includes(user.role))) {
         message.error('У вас нет доступа к этой странице');
         return <Navigate to={APP_CONFIG.ROUTES.PRIVATE.START} state={{ from: location }} replace />;

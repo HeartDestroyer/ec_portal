@@ -6,6 +6,7 @@ import { Layout } from 'antd';
 import Header from '@/technical/header.component';
 import SidebarMenu from '@/technical/menu.component';
 import { motion, AnimatePresence } from 'framer-motion';
+import Breadcrumbs from '@/technical/breadcrumbs';
 
 const { Content } = Layout;
 
@@ -57,7 +58,7 @@ const DashboardLayout: React.FC = () => {
                 onMobileMenuOpen={mobileMenuOpen}
             />
             
-            <Layout className="pt-[70px] !flex-row !bg-white">
+            <Layout className="!pt-[70px] !flex-row !bg-white">
                 <SidebarMenu
                     selectedPath={location.pathname}
                     collapsed={collapsed}
@@ -65,20 +66,21 @@ const DashboardLayout: React.FC = () => {
                     toggleSidebar={() => setCollapsed(!collapsed)}
                     onMobileMenuOpen={mobileMenuOpen}
                 />
-                    <Content className="p-5">
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={location.pathname}
-                                initial={{ opacity: 0, y: 30 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -30 }}
-                                transition={{ duration: 0.2 }}
-                            >
-                                <Outlet />
-                            </motion.div>
-                        </AnimatePresence>
-                    </Content>
-        </Layout>
+                <Content className="p-5" style={{ width: '100%' }}>
+                    <Breadcrumbs />
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={location.pathname}
+                            initial={{ opacity: 0, y: 30 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -30 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <Outlet />
+                        </motion.div>
+                    </AnimatePresence>
+                </Content>
+            </Layout>
         </Layout>
     );
 };

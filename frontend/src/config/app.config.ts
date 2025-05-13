@@ -17,7 +17,10 @@ export const API_CONFIG = {
             VERIFY_EMAIL: '/api/v1/auth/verify-email',
             RESEND_VERIFICATION: '/api/v1/auth/resend-verification',
             CSRF: '/api/v1/auth/csrf',
-            SESSIONS: '/api/v1/auth/sessions',
+        },
+        SESSIONS: {
+            SESSIONS: '/api/v1/session/sessions',
+            ADMIN_SESSIONS: '/api/v1/session/sessions/all',
         },
         USER: {
             INFO: '/api/v1/auth/me',

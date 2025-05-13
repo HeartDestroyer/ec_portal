@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import "@fontsource-variable/public-sans";
+@import 'simplebar-react/dist/simplebar.min.css';
 
 :root {
     font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; 
@@ -16,6 +17,22 @@
 	font-family: 'Public Sans Variable', system-ui, sans-serif !important;
 }
 
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    min-height: 100vh;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+    min-width: 320px;
+	overflow-x: hidden;
+}
+
 a {
 	font-weight: 500;
 	color: #0D3B66;
@@ -27,12 +44,50 @@ a:hover {
 	text-decoration: underline;
 }
 
-body {
-	margin: 0;
-	padding: 0;
-	min-width: 320px;
-	min-height: 100vh;
+/* Кастомный скроллбар для всего layout */
+/* html, body {
+    scrollbar-width: thin;
+    scrollbar-color: #e5e5e5 #fff;
 }
+html::-webkit-scrollbar, body::-webkit-scrollbar {
+    width: 0px;
+    background: #fff;
+}
+html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb {
+    background: #e5e5e5;
+    border-radius: 25px;
+}
+html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
+    background: #fff;
+} */ 
+
+
+/* Кастомный скролл */
+.custom-scrollbar::-webkit-scrollbar {
+	width: 4px;
+	height: 4px;
+}
+.custom-scrollbar-menu::-webkit-scrollbar {
+	width: 0px;
+	height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+	background-color: #e5e5e5; /* Цвет скроллбара */
+	border-radius: 25px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+	background-color: #ffffff; /* Цвет фона скроллбара */
+}
+
+/* Удаляю кастомные скроллбары с внутренних контейнеров */
+ .custom-scrollbar, .custom-scrollbar-menu {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+/* .custom-scrollbar::-webkit-scrollbar, .custom-scrollbar-menu::-webkit-scrollbar {
+    width: 0 !important;
+    background: transparent !important;
+} */
 
 h1 {
 	font-size: 1.875rem /* 24px */;
@@ -98,41 +153,20 @@ h1 {
 .custom-menu{
 	border-right: 1px solid #e5e5e5 !important;
 }
-.ant-menu-submenu>ul>li {
-	padding-left: 36px !important;
-}
-
-/* Кастомный скролл */
-.custom-scrollbar::-webkit-scrollbar {
-	width: 4px;
-	height: 4px;
-}
-.custom-scrollbar-menu::-webkit-scrollbar {
-	width: 0px;
-	height: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-	background-color: #e5e5e5; /* Цвет скроллбара */
-	border-radius: 25px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-	background-color: #ffffff; /* Цвет фона скроллбара */
-}
 
 /* Кастомные стили для бейджа */
 .ant-badge .ant-badge-count{
-	line-height: 19px;
+	line-height: 20px;
 	background: #fff;
 	color: #0d3b66;
-    border: 1px solid #0d3b66;
-	border-radius: 50%;
-	box-shadow: none;
+	padding: 0 !important;
 }
 
 .ant-menu-light .ant-menu-item-selected .ant-badge .ant-badge-count{
-	border: 1px solid #fff;
+	box-shadow: none;
 	color: #fff;
 	background: #0d3b66;
+	padding: 0 !important;
 }
 
 .animate-header {

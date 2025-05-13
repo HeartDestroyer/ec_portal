@@ -99,41 +99,6 @@ class AuthService {
         const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.CSRF);
         return response.data;
     }
-
-    /** Получение активных сессий пользователя */
-    async getActiveSessions() {
-        try {
-            const response = await apiService.get(API_CONFIG.ENDPOINTS.AUTH.SESSIONS);
-            return response.data;
-        } catch (error: any) {
-            showMessage(error.response, 'error');
-            throw error;
-        }
-    }
-
-    /** Завершение конкретной сессии */
-    async terminateSession(sessionId: string) {
-        try {
-            const response = await apiService.delete(`${API_CONFIG.ENDPOINTS.AUTH.SESSIONS}/${sessionId}`);
-            showMessage(response, 'success');
-            return response.data;
-        } catch (error: any) {
-            showMessage(error.response, 'error');
-            throw error;
-        }
-    }
-
-    /** Завершение всех сессий кроме текущей */
-    async terminateOtherSessions() {
-        try {
-            const response = await apiService.delete(API_CONFIG.ENDPOINTS.AUTH.SESSIONS);
-            showMessage(response, 'success');
-            return response.data;
-        } catch (error: any) {
-            showMessage(error.response, 'error');
-            throw error;
-        }
-    }
 }
 
 export const authService = new AuthService();

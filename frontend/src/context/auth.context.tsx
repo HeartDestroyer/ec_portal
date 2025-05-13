@@ -24,6 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
 
+    /** Загружаем данные пользователя */
     const loadUserData = async () => {
         setIsLoading(true);
         try {
@@ -39,21 +40,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // Загружаем данные только при первом рендере
+    /** Загружаем данные только при первом рендере */
     useEffect(() => {
         loadUserData();
     }, []);
 
+    /** Обрабатываем авторизацию */
     const handleLogin = async (data: LoginFormData) => {
         await authService.login(data);
         setIsAuthenticated(true);
         await loadUserData();
     };
 
+    /** Обрабатываем регистрацию */
     const handleRegister = async (data: RegisterFormData) => {
         await authService.register(data);
     };
 
+    /** Обрабатываем выход из системы */
     const handleLogout = async () => {
         await authService.logout();
         setIsAuthenticated(false);

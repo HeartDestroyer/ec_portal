@@ -49,12 +49,3 @@ export interface NewPasswordFormData {
 export interface ResetPasswordFormData {
     email: string;
 }
-
-export interface Session {
-    id: string;
-    device: string;
-    browser: string;
-    ip: string;
-    last_activity: string;
-    is_current: boolean;
-}

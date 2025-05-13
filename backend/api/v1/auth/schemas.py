@@ -1,6 +1,5 @@
-# backend/api/auth/schemas.py
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List
+from typing import Optional
 from datetime import date, datetime
 import uuid
 
@@ -143,20 +142,3 @@ class CSRFTokenResponse(BaseModel):
     """
     csrf_token: str
 
-class SessionResponse(BaseModel):
-    """
-    Схема для ответа с информацией о сессии
-    """
-    id: uuid.UUID
-    device: Optional[str] = None
-    browser: Optional[str] = None
-    os: Optional[str] = None
-    platform: Optional[str] = None
-    location: Optional[str] = None
-    ip_address: Optional[str] = None
-    last_activity: datetime
-    created_at: datetime
-    is_current: bool = False
-
-    class Config:
-        from_attributes = True

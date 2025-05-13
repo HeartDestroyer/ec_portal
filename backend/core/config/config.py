@@ -18,6 +18,7 @@ class BaseSettingsClass(BaseSettings):
     SECRET_KEY: str = Field(..., env="SECRET_KEY", description="Секретный ключ приложения")
     DEBUG: bool = False
     ENVIRONMENT: str = Field(..., env="ENVIRONMENT", description="Окружение")
+    ADMIN_ROLES: List[str] = ["admin", "superadmin"]
 
     # Сервер
     SERVER_HOST: str = "127.0.0.1"

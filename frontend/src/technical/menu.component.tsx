@@ -66,16 +66,16 @@ const getMenuItems = (): MenuItem[] => [
             {
                 key: APP_CONFIG.ROUTES.PRIVATE.LETTER,
                 icon: <ThunderboltOutlined />,
-                label: 'Шаблоны писем',
+                label: 'Email письма',
                 roles: [...ROLES.WORKERS],
-                badge: 5
+                badge: 3
             },
             {
                 key: APP_CONFIG.ROUTES.PRIVATE.ACHIEVEMENTS,
                 icon: <ThunderboltOutlined />,
                 label: 'Достижения',
                 roles: [...ROLES.WORKERS],
-                badge: 3
+                badge: 155
             }
         ]
     },
@@ -297,16 +297,16 @@ const SidebarMenu: React.FC<SidebarMenuProps> = memo(({
                         className='!rounded-full !text-sm'
                     />
                 </div>
-
+                
                 {/* Меню */}
                 <div className={`
                     ${collapsed ? '!w-20' : '!w-64'}
                     ${onMobileMenuOpen ? 'h-full' : 'h-[calc(100vh-70px)]'}
-                    custom-scrollbar custom-scrollbar-menu custom-menu
-                    z-40 sticky top-20 transition-all duration-300 bg-white overflow-y-auto
-                `}>
+                    custom-scrollbar custom-menu custom-scrollbar-menu
+                    z-40 sticky top-[70px] transition-all duration-300 bg-white overflow-y-auto
+                `}>                    
                     <Menu
-                        className={`h-full !pt-2 ${collapsed ? '' : '!px-3'} !text-[15px]`}
+                        className={`h-full !py-2 ${collapsed ? '' : '!px-3'} !text-[15px]`}
                         selectedKeys={[selectedPath]}
                         defaultOpenKeys={[location.pathname.split('/')[2]]}
                         mode="inline"

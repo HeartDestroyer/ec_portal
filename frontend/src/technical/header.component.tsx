@@ -25,11 +25,12 @@ const Header: React.FC<HeaderProps> = memo(({
 
     const headerStyle: React.CSSProperties = {
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 20,
-        backgroundColor: '#fff', height: 70, padding: '0 30px'
+        backgroundColor: 'rgba(255, 255, 255, 0.9)', height: 70, padding: '0 25px',
+        borderBottom: '1px solid #e5e5e5'
     };
 
     return (
-        <AntHeader style={headerStyle} className="flex items-center justify-between shadow-md">
+        <AntHeader style={headerStyle} className="flex items-center justify-between">
             <div className='flex flex-row items-center gap-3 sm:gap-5'>
                 <div className= {`${onMobileMenuOpen ? 'block' : 'hidden'}`}>
                     <Button

@@ -94,6 +94,9 @@ class User(Base):
     locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
     last_password_change: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, doc="Дата последнего изменения пароля")
 
+    crm_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True, doc="ID в CRM")
+    old_id: Mapped[Optional[int]] = mapped_column(default=None, nullable=True, index=True, doc="ID в старой системе")
+
     # Связи
     department: Mapped[Optional["Department"]] = relationship("Department", back_populates="users")
     group: Mapped[Optional["Group"]] = relationship("Group", back_populates="users")

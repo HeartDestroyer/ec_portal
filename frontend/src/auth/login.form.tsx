@@ -34,7 +34,7 @@ const LoginForm: React.FC = () => {
                 name="loginForm"
                 layout="vertical"
                 initialValues={{ remember: true }}
-                className="w-full max-w-md"
+                className="w-full !px-3 max-w-md"
                 onFinish={onFinish}
                 validateTrigger={['onChange', 'onBlur']}
                 autoComplete="off"

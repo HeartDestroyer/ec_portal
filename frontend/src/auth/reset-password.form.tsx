@@ -28,7 +28,7 @@ const ResetPassword: React.FC = () => {
             <Form<ResetPasswordFormData>
                 form={form}
                 name="password-recovery"
-                className="flex flex-col w-full max-w-md"
+                className="flex flex-col w-full !px-3 max-w-md"
                 onFinish={onFinish}
             >
                 <div className="mb-8 text-2xl sm:text-3xl font-bold text-center">Восстановление пароля на {APP_CONFIG.NAME}е</div>

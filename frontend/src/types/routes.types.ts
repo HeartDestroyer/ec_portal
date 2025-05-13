@@ -43,6 +43,7 @@ export interface PrivateRoutes {
     AUDIO_OBJECTIONS: string;
     SHOP: string;
     SETTINGS: string;
+    SESSIONS: string;
 }
 
 export interface RoutePaths {
