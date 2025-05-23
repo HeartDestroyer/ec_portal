@@ -7,39 +7,18 @@ import uuid
 from core.models.base import Base
 
 class Session(Base):
-    """
-    Модель для хранения информации о сессиях пользователей
-    """
     __tablename__ = "sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    device: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    browser: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    os: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    platform: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    last_activity: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, doc="ID сессии")
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, doc="ID пользователя")
+    device: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="Устройство")
+    browser: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="Браузер устройства  ")
+    ip_address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="IP-адрес устройства")
+    os: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="Операционная система устройства")
+    platform: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="Платформа устройства")
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, doc="Местоположение устройства")
+    last_activity: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, doc="Последняя активность сессии")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, doc="Дата создания сессии")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, doc="Активность сессии")
 
-    # Связь с пользователем
     user = relationship("User", back_populates="sessions")
-
-    def to_dict(self):
-        """
-        Сериализация модели сессии пользователя в словарь
-        """
-        return {
-            "id": self.id,
-            "device": self.device,
-            "browser": self.browser,
-            "ip_address": self.ip_address,
-            "os": self.os,
-            "platform": self.platform,
-            "location": self.location,
-            "last_activity": self.last_activity.isoformat(),
-            "created_at": self.created_at.isoformat(),
-            "is_active": self.is_active
-        }

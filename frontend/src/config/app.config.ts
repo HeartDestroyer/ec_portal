@@ -19,8 +19,7 @@ export const API_CONFIG = {
             CSRF: '/api/v1/auth/csrf',
         },
         SESSIONS: {
-            SESSIONS: '/api/v1/session/sessions',
-            ADMIN_SESSIONS: '/api/v1/session/sessions/all',
+            SESSIONS: '/api/v1/session',
         },
         USER: {
             INFO: '/api/v1/auth/me',

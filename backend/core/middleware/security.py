@@ -1,12 +1,8 @@
-# core/middleware/security.py
-# Добавляет заголовки безопасности к ответам
-
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class SecurityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Добавление security headers
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"

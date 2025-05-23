@@ -1,84 +1,70 @@
-from datetime import datetime
-import uuid
-from fastapi import HTTPException, status
+from datetime import datetime, timedelta
+from fastapi import HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from redis.asyncio import Redis
-from typing import Optional, Tuple, Dict, Any
-from fastapi import Request
+from typing import Optional
+from datetime import datetime
+import pyotp
 
-# Модели и схемы
+from api.v1.schemas import MessageResponse, TokenPayload, Tokens
+from api.v1.dependencies import (
+    JWTHandler, EmailManager, SessionManager,
+    settings, logger
+)
+from core.security.password import password_manager
 from core.models.user import User
 from .schemas import UserCreate, ResetPassword, UserLogin
-from core.extensions.logger import logger
-
-# Сервисы и зависимости
-from api.v1.session.services import SessionService
-
-# Утилиты безопасности
-from core.security.password import password_manager
-from core.security.jwt import JWTHandler
-from core.security.email import EmailManager
+from api.v1.session.utils import SessionUtils
 from utils.functions import format_phone_number
 
-# Сервис для аутентификации пользователя
-class AuthenticationService:
-    """
-    Сервис для аутентификации пользователя
 
-    :`get_user_by_login_or_email`: - Получение пользователя по имени или email
-    :`register`: - Регистрация пользователя
-    :`authenticate_user`: - Аутентификация пользователя
-    :`refresh_access_token`: - Обновление токенов
-    :`logout`: - Выход из системы
-    :`request_password_reset_service`: - Запрос на сброс пароля
-    :`reset_password_service`: - Сброс пароля
-    :`verify_email_token`: - Верификация `email` пользователя, в случае успеха верифицирует и активирует пользователя
-    :`request_email_verification`: - Запрос на подтверждение `email`
+class UserRepository:
     """
+    Репозиторий для работы с пользователями\n
+    Реализует паттерн Repository, абстрагирующий доступ к данным пользователей
 
-    # Инициализация
-    def __init__(self, db: AsyncSession, redis: Redis, jwt_handler: JWTHandler, email_manager: EmailManager):
+    Методы:
+    - `get_by_id()` - Находит пользователя по ID
+    - `get_by_login_or_email()` - Находит пользователя по login или email
+    - `create_user()` - Создает нового пользователя
+    - `update_user()` - Обновляет данные пользователя
+    """
+    
+    def __init__(self, db: AsyncSession):
         self.db = db
-        self.redis = redis
-        self.jwt_handler = jwt_handler
-        self.email_manager = email_manager
-
-    # Получение пользователя по имени или email
-    async def get_user_by_login_or_email(self, login_or_email: str) -> Optional[User]:
+    
+    async def get_by_id(self, user_id: str) -> Optional[User]:
         """
-        Находит пользователя по `login` или `email` в таблице `users`
-        :param login_or_email: `login` или `email` пользователя
-        :return: Пользователь или None
+        Находит пользователя по ID в таблице User\n
+        `user_id` - ID пользователя\n
+        Возвращает пользователя или None
+        """
+        query = select(User).where(User.id == user_id)
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def get_by_login_or_email(self, login_or_email: str) -> Optional[User]:
+        """
+        Находит пользователя по login или email в таблице User\n
+        `login_or_email` - login/email пользователя\n
+        Возвращает пользователя или None
         """
         query = select(User).where(
             or_(User.login == login_or_email, User.email == login_or_email)
         )
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
-
-    # Регистрация пользователя
-    async def register(self, user_data: UserCreate) -> Tuple[User, str]:
+    
+    async def create_user(self, user_data: UserCreate) -> User:
         """
-        Регистрация нового пользователя в таблице `users`
-        :param user_data: Данные пользователя для регистрации
-        :return: Кортеж из пользователя и сообщения
+        Создает нового пользователя\n
+        `user_data` - Данные пользователя для регистрации\n
+        Возвращает нового пользователя  
         """
-        existing_user = await self.get_user_by_login_or_email(user_data.login)
-        if existing_user:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Пользователь с таким логином уже существует"
-            )
-        existing_user = await self.get_user_by_login_or_email(user_data.email)
-        if existing_user:
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Пользователь с таким email уже существует"
-            )
 
+        formatted_phone = format_phone_number(user_data.phone)
         hashed_password = password_manager.hash_password(user_data.password)
-        formatted_phone = format_phone_number(user_data.phone) if user_data.phone else None
 
         new_user = User(
             **user_data.model_dump(exclude={"password", 'phone'}),
@@ -87,269 +73,348 @@ class AuthenticationService:
             is_active=False,
             is_verified=False
         )
-
         self.db.add(new_user)
         await self.db.commit()
         await self.db.refresh(new_user)
-
-        # Отправка письма для подтверждения
-        if self.email_manager:
-            try:
-                await self.email_manager.send_verification_email(new_user.email, new_user.id)
-            except Exception as err:
-                logger.error(f"Ошибка в отправке письма для подтверждения {new_user.email}: {err}")
-
-        return new_user, "Письмо для подтверждения отправлено на почту"
-
-    # Аутентификация пользователя
-    async def authenticate_user(self, credentials: UserLogin, request: Request) -> Tuple[str, str]:
-        """
-        Аутентификация пользователя и создание сессии
-        :param `credentials`: Данные для входа
-        :param `request`: Запрос для получения информации о пользователе
-        :return: `access_token`, `refresh_token`
-        """
-        user = await self.get_user_by_login_or_email(credentials.login_or_email)
-        session_service = SessionService(self.db, self.jwt_handler)
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверное имя пользователя/email или пароль"
-            )
+        return new_user
     
-        # Проверка блокировки (защита от брутфорса)
-        if await password_manager.check_brute_force(user):
-            locked_duration = (user.locked_until - datetime.utcnow()).total_seconds()
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Аккаунт временно заблокирован. Попробуйте через {int(locked_duration // 60)} минут"
-            )
-        
-        # Проверка активности аккаунта
-        if not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Аккаунт деактивирован, обратитесь к администратору"
-            )
-
-        # Проверка пароля
-        if not password_manager.verify_password(credentials.password, user.hashed_password):
-            await password_manager.handle_failed_login(user)
-            await self.db.commit()
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Неверное имя пользователя/email или пароль"
-            )
-
-        # Сброс счетчика неудачных попыток и обновление last_login
-        await password_manager.reset_failed_attempts(user)
-        user.last_login = datetime.utcnow()
-        await self.db.commit()
-        await self.db.refresh(user)
-
-        browser, os, platform, device, location = await session_service.user_agent_info(request)
-        session = await session_service.create_session(
-            user=user,
-            device=device,
-            browser=browser,
-            ip_address=request.client.host if request.client else None,
-            os=os,
-            platform=platform,
-            location=location
-        )
-
-        # Создание токенов с ID сессии
-        user_payload = {
-            "id": str(user.id),
-            "email": user.email,
-            "role": user.role.value,
-            "login": user.login,
-            "session_id": str(session.id)
-        }
-        access_token, refresh_token = await self.jwt_handler.create_tokens(user_payload, self.redis)
-
-        return access_token, refresh_token
-
-    # Обновление токенов
-    async def refresh_access_token(self, refresh_token: str) -> Tuple[str, str]:
+    async def update_user(self, user: User) -> User:
         """
-        Обновляет `access` и `refresh` токены
-        :param `refresh_token`: Refresh токен
-        :return: Кортеж из `access` токена и `refresh` токена
+        Обновляет данные пользователя\n
+        `user` - Пользователь для обновления\n
+        Возвращает обновленного пользователя
         """
-        # Проверка refresh токена
-        payload = await self.jwt_handler.verify_token(refresh_token, "refresh", self.redis)
-        session_service = SessionService(self.db, self.jwt_handler)
-
-        # Получение пользователя
-        user_id = uuid.UUID(payload["id"])
-        session_id = uuid.UUID(payload["session_id"])
-        query = select(User).where(User.id == user_id)
-        result = await self.db.execute(query)
-        user = result.scalar_one_or_none()
-
-        if not user or not user.is_active:
-            await self.jwt_handler.revoke_tokens(str(user_id), self.redis, str(session_id))
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Невалидный refresh токен или пользователь неактивен"
-            )
-
-        if session_id:
-            if not await session_service.check_session_validity(str(session_id)):
-                await self.jwt_handler.revoke_tokens(str(user_id), self.redis, str(session_id))
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Сессия истекла или неактивна"
-                )
-
-        # Отзыв старых токенов текущей сессии (обязательно перед созданием новых)
-        await self.jwt_handler.revoke_tokens(str(user_id), self.redis, str(session_id))
-
-        # Создание новых токенов с ID сессии
-        user_payload = {
-            "id": str(user.id),
-            "email": user.email,
-            "role": user.role.value,
-            "login": user.login,
-            "session_id": str(session_id)
-        }
-        new_access_token, new_refresh_token = await self.jwt_handler.create_tokens(user_payload, self.redis)
-
-        return new_access_token, new_refresh_token
-
-    # Выход из системы
-    async def logout(self, payload: Dict[str, Any]) -> Tuple[str, str]:
-        """
-        Выход из системы
-        :param `payload`: Данные пользователя
-        :return: Кортеж из `user_id` и `session_id`
-        """
-        try:
-            user_id = str(payload.get("id"))
-            session_id = str(payload.get("session_id"))
-            user_role = str(payload.get("role"))
-
-            if not user_id or not session_id:
-                raise HTTPException(status_code=400, detail="Неверные данные пользователя")
-
-            # Проверяем, что это валидные UUID
-            uuid.UUID(user_id)
-            uuid.UUID(session_id)
-
-            # Отзыв токенов только для текущей сессии
-            await self.jwt_handler.revoke_tokens(user_id, self.redis, session_id)
-
-            try:
-                # Пытаемся деактивировать сессию, если она существует
-                session_service = SessionService(self.db, self.jwt_handler)
-                await session_service.deactivate_session(session_id, user_id, user_role)
-            except HTTPException as err:
-                if err.status_code == 404:
-                    logger.info(f"Сессия {session_id} не найдена при выходе пользователя {user_id}")
-                else:
-                    raise
-
-            return user_id, session_id
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Неверный формат ID")
-        except Exception as err:
-            logger.error(f"Ошибка при выходе из системы: {err}")
-            raise HTTPException(status_code=500, detail="Ошибка при выходе из системы")
-    
-    # Запрос на сброс пароля
-    async def request_password_reset_service(self, email: str) -> None:
-        """
-        Запрос на сброс пароля
-        :param email: Email пользователя
-        """
-        if not self.email_manager:
-            raise HTTPException(status_code=500, detail="Сервис Email не настроен")
-        user = await self.get_user_by_login_or_email(email)
-        if user:
-            # Всегда возвращаем успех, чтобы не раскрывать существование email
-            try:
-                await self.email_manager.send_password_reset_email(user.email, user.id)
-            except Exception as err:
-                logger.error(f"Ошибка в отправке письма для сброса пароля {email}: {err}")
-
-    # Сброс пароля
-    async def reset_password_service(self, data: ResetPassword) -> None:
-        """
-        Сброс `password` пользователя по `токену` из `email` и отзыв всех активных сессий пользователя
-        :param `data`: Данные для сброса пароля `token`, `new_password`
-        """
-        if not self.email_manager:
-            raise HTTPException(status_code=500, detail="Сервис Email не настроен")
-        payload = self.email_manager.verify_token(data.token, "password_reset")
-        if not payload:
-            raise HTTPException(status_code=400, detail="Невалидный или просроченный токен")
-
-        # Получение пользователя
-        user_id = uuid.UUID(payload["id"])
-        session_id = uuid.UUID(payload["session_id"])
-        query = select(User).where(User.id == user_id)
-        result = await self.db.execute(query)
-        user = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-        if not session_id:
-            raise HTTPException(status_code=400, detail="Сессия пользователя не найдена")
-
-        # Обновляем пароль
-        user.hashed_password = password_manager.hash_password(data.new_password)
-        # Сбрасываем блокировку, если была
-        user.failed_login_attempts = 0
-        user.locked_until = None
-        await self.db.commit()
-
-        # Отзываем все токены пользователя после сброса пароля
-        await self.jwt_handler.revoke_tokens(str(user.id), self.redis)
-
-        # Деактивация всех сессий пользователя
-        session_service = SessionService(self.db, self.jwt_handler)
-        await session_service.deactivate_all_sessions(str(user.id))
-
-    # Верификация email
-    async def verify_email_token(self, token: str) -> User:
-        """
-        Верификация `email` пользователя, в случае успеха верифицирует и активирует пользователя
-        :param `token`: `Токен` для верификации
-        :return: Пользователь
-        """
-        if not self.email_manager:
-            raise HTTPException(status_code=500, detail="Сервис Email не настроен")
-        payload = self.email_manager.verify_token(token, "email_verification")
-        if not payload:
-            raise HTTPException(status_code=400, detail="Невалидный или просроченный токен")
-
-        user_id = uuid.UUID(payload["id"])
-        query = select(User).where(User.id == user_id)
-        result = await self.db.execute(query)
-        user = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
-        if user.is_verified:
-            raise HTTPException(status_code=400, detail="Почта уже подтверждена")
-
-        user.is_verified = True
-        user.is_active = True # Активируем пользователя после подтверждения
         await self.db.commit()
         await self.db.refresh(user)
         return user
 
-    # Запрос на подтверждение email
-    async def request_email_verification(self, user: User):
+
+class AuthenticationService:
+    """
+    Сервис для аутентификации пользователя\n
+    Использует паттерн Service, абстрагирующий доступ к данным и бизнес-логику\n
+    Методы:
+        - `update_user_login_info()` - Обновляет информацию о последнем входе пользователя и сбрасывает количество неудачных попыток входа\n
+        - `register_service()` - Регистрация нового пользователя в таблице User\n
+        - `authenticate_user_service()` - Аутентификация пользователя (включает в себя проверку блокировки, активность, подтверждение акаунта, пароль и отправку уведомления на почту)\n
+        - `refresh_tokens_service()` - Обновление токенов\n
+        - `logout_service()` - Выход из системы\n
+        - `request_password_reset_service()` - Запрос на сброс пароля\n
+        - `reset_password_service()` - Сброс пароля\n
+        - `verify_email_service()` - Подтверждение почты\n
+        - `enable_2fa_service()` - Двухфакторная аутентификация
+        
+    TODO:
+        - Создать сервис для двухфакторной аутентификации
+        - Добавлять в blacklist refresh токены при массовых инвалидациях токенов
+    """
+
+    def __init__(self, db: AsyncSession, redis: Optional[Redis], jwt_handler: Optional[JWTHandler], email_manager: Optional[EmailManager]):
+        self.db = db
+        self.redis = redis
+        self.jwt_handler = jwt_handler
+        self.email_manager = email_manager
+        self.max_sessions = settings.MAX_ACTIVE_SESSIONS_PER_USER
+        self.session_service = SessionManager(db, jwt_handler, redis)
+        self.session_utils = SessionUtils()
+        self.user_repository = UserRepository(db)
+        self.tg_chat_url = "https://t.me/XopXeyLalalei"
+        self.project_name = settings.PROJECT_NAME
+
+    async def update_user_login_info(self, user: User) -> User:
         """
-        Запрос на подтверждение `email`
-        :param `user`: Пользователь
+        Обновляет информацию о последнем входе пользователя и сбрасывает количество неудачных попыток входа\n
+        `user` - Пользователь для обновления\n
+        Возвращает обновленного пользователя
         """
-        if not self.email_manager:
-            raise HTTPException(status_code=500, detail="Cервис Email не настроен")
-        if user.is_verified:
-            raise HTTPException(status_code=400, detail="Почта уже подтверждена")
-        await self.email_manager.send_verification_email(user.email, user.id)
+        try:
+            await password_manager.reset_failed_attempts(user)
+            user.last_login = datetime.utcnow()
+            return await self.user_repository.update_user(user)
+        except Exception as err:
+            logger.error(f"Ошибка при обновлении информации о входе пользователя {str(user.id)}: {err}")
+            raise HTTPException(detail="Ошибка при обновлении информации о входе", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    async def register_service(self, user_data: UserCreate) -> User:
+        """
+        Регистрация нового пользователя в таблице User\n
+        `user_data` - Данные пользователя для регистрации в виде UserCreate\n
+        Возвращает нового пользователя
+        """
+        try:
+            user_login = await self.user_repository.get_by_login_or_email(user_data.login)
+            user_email = await self.user_repository.get_by_login_or_email(user_data.email)
+            if user_login or user_email:
+                raise HTTPException(detail="Пользователь с таким логином или почтой уже существует", status_code=status.HTTP_400_BAD_REQUEST)
+            
+            new_user = await self.user_repository.create_user(user_data)
+
+            try:
+                await self.email_manager.send_verification_email(new_user.email, str(new_user.id))
+            except Exception as err:
+                logger.error(f"Ошибка в отправке письма для подтверждения {new_user.email}: {err}")
+                raise HTTPException(
+                    detail="Ошибка при отправке письма для подтверждения почты, обратитесь к администратору", 
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return new_user
+            
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при регистрации пользователя: {err}")
+            raise HTTPException(detail="Ошибка при регистрации пользователя", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    async def authenticate_user_service(self, credentials: UserLogin, request: Request) -> Tokens:
+        """
+        Аутентификация пользователя\n
+        `credentials` - Учетные данные пользователя в виде UserLogin\n
+        `request` - Объект запроса FastAPI\n
+        Возвращает токены в виде Tokens
+        """
+        try:
+            user = await self.user_repository.get_by_login_or_email(credentials.login_or_email)
+            if not user:
+                raise HTTPException(detail="Неверное имя пользователя/почта или пароль", status_code=status.HTTP_404_NOT_FOUND)
+            
+            # Проверка блокировки
+            if await password_manager.check_brute_force(user):
+                locked_duration = (user.locked_until - datetime.utcnow()).total_seconds()
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Аккаунт временно заблокирован. Попробуйте через {int(locked_duration // 60)} минут"
+                )
+
+            # Проверяем активность пользователя
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Аккаунт деактивирован, обратитесь к администратору")
+            
+            # Проверка подтверждения акаунта
+            if not user.is_verified:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Аккаунт не подтвержден, обратитесь к администратору")
+            
+            # Проверка пароля
+            if not password_manager.verify_password(credentials.password, user.hashed_password):
+                await password_manager.handle_failed_login(user)
+                await self.db.commit()
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Неверное имя пользователя/почта или пароль")
+
+            # Сброс счетчика неудачных попыток и обновление last_login
+            await self.update_user_login_info(user)
+
+            # Получаем информацию о пользовательском агенте и создаем новую сессию
+            # Деактивируем старые сессии если их количество превышает лимит активных сессий
+            user_agent_info = await self.session_utils.user_agent_info(request)
+            new_session = await self.session_service.create_session(user, user_agent_info)
+
+            message_notification = (
+                "<b>Вы успешно вошли в систему</b><br><br>"
+                "Данные входа:<br>"
+                f"IP-адрес: {user_agent_info.ip_address}<br>"
+                f"Местоположение: {user_agent_info.location}<br>"
+                f"Устройство: {user_agent_info.browser} • {user_agent_info.os}<br>"
+                f"Время входа: {datetime.utcnow().strftime('%d.%m.%Y %H:%M:%S')} (UTC)<br><br>"
+                f"<span style='color:red;'>Если это были не вы, сразу же обратитесь в <a href='{self.tg_chat_url}'>ТГ-чат</a></span>"
+            )
+
+            # Отправляем уведомление на почту
+            await self.email_manager.send_notification_email(user.email, f"Новый вход в {self.project_name}", message_notification)
+
+            tokens = await self.jwt_handler.create_tokens(
+                TokenPayload(
+                    user_id=str(user.id),
+                    session_id=str(new_session.id),
+                    role=user.role
+                ),
+                self.redis
+            )
+            return tokens
+            
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при аутентификации пользователя: {err}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при аутентификации пользователя")
+
+    async def refresh_tokens_service(self, refresh_token: str) -> Tokens:
+        """
+        Обновление токенов и обновление времени последней активности сессии и добавление старого refresh токена в черный список\n
+        `refresh_token` - Токен обновления\n
+        Возвращает новые токены в виде Tokens
+        """
+        payload: Optional[TokenPayload] = None
+        try:            
+            payload = await self.jwt_handler.verify_token(refresh_token, "refresh", self.redis)
+            await self.jwt_handler.set_refresh_token_to_blacklist(refresh_token, self.redis)
+            await self.jwt_handler.revoke_tokens(payload.user_id, self.redis, payload.session_id)
+            await self.session_service.update_session_last_activity(payload.session_id)
+            tokens = await self.jwt_handler.create_tokens(payload, self.redis)
+            return tokens
+            
+        except HTTPException:
+            # Деактивируем по реальному payload, если он есть
+            if payload:
+                await self.session_service.deactivate_session(payload.session_id, payload.user_id, payload.role)
+            else:
+                # Пытаемся «мягко» достать данные из токена без верификации
+                payload = await self.jwt_handler.decode_token(refresh_token)
+                if payload:
+                    await self.session_service.deactivate_session(payload.session_id, payload.user_id, payload.role)
+            await self.jwt_handler.set_refresh_token_to_blacklist(refresh_token, self.redis)
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при обновлении токенов: {err}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при обновлении токенов")
+
+    async def logout_service(self, user_id: str, session_id: str, refresh_token: str) -> None:
+        """
+        Выход из системы и добавление старого refresh токена в черный список\n
+        `user_id` - ID пользователя\n
+        `session_id` - ID сессии\n
+        `refresh_token` - Токен обновления\n
+        Возвращает True при успешном выходе
+        """
+        try:            
+            await self.jwt_handler.revoke_tokens(user_id, self.redis, session_id)
+            user = await self.user_repository.get_by_id(user_id)
+            await self.session_service.deactivate_session(session_id, user_id, user.role)
+            await self.jwt_handler.set_refresh_token_to_blacklist(refresh_token, self.redis)
+            await self.db.commit()
+                        
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при выходе из системы: {err}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при выходе из системы")
+
+    async def request_password_reset_service(self, email: str) -> MessageResponse:
+        """
+        Запрос на сброс пароля\n
+        `email` - Почта пользователя\n
+        Возвращает сообщение об успешной отправке письма
+        """
+        try:            
+            user = await self.user_repository.get_by_login_or_email(email)
+            if not user:
+                logger.info(f"Запрос на сброс пароля для несуществующей почты: {email}")
+                return MessageResponse(message="Если пользователь существует, письмо для сброса пароля было отправлено")
+            
+            if not user.is_active:
+                logger.info(f"Запрос на сброс пароля для неактивного пользователя: {email}")
+                return MessageResponse(message="Если пользователь существует, письмо для сброса пароля было отправлено")
+            
+            await self.email_manager.send_password_reset_email(user.email, str(user.id))
+            return MessageResponse(message="Если пользователь существует, письмо для сброса пароля было отправлено")
+            
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при запросе сброса пароля: {err}")
+            return MessageResponse(message="Если пользователь существует, письмо для сброса пароля было отправлено")
+
+    async def reset_password_service(self, data: ResetPassword) -> MessageResponse:
+        """
+        Сброс пароля и добавление старого refresh токена в черный список\n
+        `data` - Данные для сброса пароля в виде ResetPassword\n
+        Возвращает сообщение об успешном сбросе пароля
+        """
+        try:
+            try:
+                payload = self.jwt_handler.decode_reset_token(data.token)
+                user_id = payload.get("user_id")
+                if not user_id:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недействительный токен сброса пароля")
+                
+            except Exception as err:
+                logger.error(f"Ошибка при проверке токена сброса пароля: {err}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Недействительный токен сброса пароля"
+                )
+            
+            user = await self.user_repository.get_by_id(user_id)
+            if not user:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пользователь не найден")
+            
+            if not user.is_active:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пользователь деактивирован, обратитесь к администратору")
+            
+            hashed_password = password_manager.hash_password(data.new_password)
+            user.hashed_password = hashed_password
+            user.last_password_change = datetime.utcnow()
+            
+            # Сбрасываем неудачные попытки входа и разблокируем аккаунт
+            await password_manager.reset_failed_attempts(user)
+            
+            # Деактивируем все сессии пользователя
+            active_sessions = await self.session_service.get_active_sessions_user(str(user.id))
+            if active_sessions:
+                for session in active_sessions:
+                    await self.session_service.deactivate_session(str(session.id), str(user.id), user.role)
+            await self.jwt_handler.revoke_tokens(str(user.id), self.redis)
+            logger.info(f"Отозваны все токены пользователя {user_id} при сбросе пароля")
+            
+            await self.db.commit()
+            logger.info(f"Пароль успешно изменен для пользователя {user_id}")
+            
+            return MessageResponse(message="Пароль успешно изменен")
+            
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при сбросе пароля: {err}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка при сбросе пароля"
+            )
+
+    async def verify_email_service(self, token: str) -> MessageResponse:
+        """
+        Подтверждение почты после перехода по ссылке в письме\n
+        `token` - Токен подтверждения\n
+        Возвращает сообщение об успешном подтверждении
+        """
+        try:
+            try:
+                payload = self.jwt_handler.decode_verification_token(token)
+                user_id = payload.get("user_id")
+                if not user_id:
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недействительный токен подтверждения")
+                
+            except Exception as err:
+                logger.error(f"Ошибка при проверке токена подтверждения почты: {err}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Недействительный токен подтверждения почты"
+                )
+            
+            user = await self.user_repository.get_by_id(user_id)
+            if not user:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Пользователь не найден")
+            
+            if user.is_verified:
+                return MessageResponse(message="Почта уже подтверждена")
+                
+            user.is_verified = True
+            user.is_active = True
+            await self.db.commit()
+            
+            logger.info(f"Почта успешно подтверждена для пользователя {user_id}")
+            return MessageResponse(message="Почта успешно подтверждена")
+            
+        except HTTPException:
+            raise
+        except Exception as err:
+            logger.error(f"Ошибка при подтверждении email: {err}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Ошибка при подтверждении email"
+            )
+
+    async def enable_2fa_service(self) -> MessageResponse:
+        """
+        Включение двухфакторной аутентификации\n
+        Возвращает сообщение об успешном включении двухфакторной аутентификации
+        """
+        return MessageResponse(message="TODO: Запилить двухфакторную аутентификацию")

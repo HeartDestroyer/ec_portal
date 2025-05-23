@@ -1,10 +1,9 @@
-# backend/core/extensions/database.py
-
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+
 from core.config.config import settings
 
 engine = create_async_engine(
@@ -19,7 +18,6 @@ engine = create_async_engine(
     pool_pre_ping=settings.SQLALCHEMY_ENGINE_OPTIONS.get("pool_pre_ping", True),
 )
 
-# Создаем фабрику асинхронных сессий
 AsyncSessionFactory = sessionmaker(
     engine,
     class_=AsyncSession,
@@ -28,9 +26,12 @@ AsyncSessionFactory = sessionmaker(
     autoflush=False,
 )
 
-# Создаем контекстный менеджер для асинхронных сессий
 @asynccontextmanager
 async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Контекстный менеджер для асинхронных сессий\n
+    Возвращает сессию
+    """
     async with AsyncSessionFactory() as session:
         try:
             yield session
@@ -38,7 +39,10 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
             await session.rollback()
             raise
 
-# Зависимость для получения сессии
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Зависимость для получения сессии\n
+    Возвращает сессию
+    """
     async with get_async_session() as session:
         yield session

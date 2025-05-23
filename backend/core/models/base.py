@@ -1,5 +1,3 @@
-# backend/core/models/base.py
-
 from sqlalchemy.orm import declarative_base
 from sqlalchemy import MetaData
 

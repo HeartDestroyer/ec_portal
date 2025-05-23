@@ -10,18 +10,10 @@ import type { SessionsPage, SessionFilter } from '@/types/session.types';
 
 class SessionService {
 
-    /** Получение сессий всех пользователей для администратора */
-    async getSessions(filter: SessionFilter): Promise<SessionsPage> {
-        try {
-            const response = await apiService.get(API_CONFIG.ENDPOINTS.SESSIONS.ADMIN_SESSIONS, { params: filter });
-            return response.data as SessionsPage;
-        } catch (error: any) {
-            showMessage(error.response, 'error');
-            throw error;
-        }
-    }
-
-    /** Получение активных сессий пользователя */
+    /** 
+     * Получение активных сессий пользователей для администратора
+     * Получение своих активных сессий для обычного пользователя
+     */
     async getActiveSessions(filter: SessionFilter): Promise<SessionsPage> {
         try {
             const response = await apiService.get(API_CONFIG.ENDPOINTS.SESSIONS.SESSIONS, { params: filter });

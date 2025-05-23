@@ -1,33 +1,33 @@
-# main.py
 from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
-from typing import Callable
+from typing import Callable, List, Any
 import time
+import pkg_resources
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
 
-# Конфигурация и расширения
 from core.config.config import settings
+from core.models.base import Base
 from core.extensions.database import engine
 from core.extensions.redis import redis_client
 from core.extensions.logger import logger
-from core.models.base import Base
 from core.middleware.rate_limiter import RateLimitMiddleware
 from core.middleware.security import SecurityMiddleware
 from core.middleware.metrics import PrometheusMiddleware
 
-# Wrapper для асинхронных итераторов 
 class AsyncIteratorWrapper:
     """
     Wrapper для асинхронных итераторов, обеспечивающий правильное закрытие
     """
-    def __init__(self, obj):
+    def __init__(self, obj: Any) -> None:
         self._it = obj
-        self._close_callbacks = []
+        self._close_callbacks: List[Callable] = []
 
-    async def __aiter__(self):
+    async def __aiter__(self) -> Any:
         try:
             async for item in self._it:
                 yield item
@@ -35,22 +35,74 @@ class AsyncIteratorWrapper:
             for callback in self._close_callbacks:
                 await callback()
 
-    def add_callback(self, callback):
+    def add_callback(self, callback: Callable) -> None:
         self._close_callbacks.append(callback)
 
-# Middleware для измерения времени выполнения запросов
 class TimingMiddleware(BaseHTTPMiddleware):
     """
     Middleware для измерения времени выполнения запросов
     """
-    async def dispatch(self, request: Request, call_next: Callable):
+    async def dispatch(self, request: Request, call_next: Callable) -> Any:
         start_time = time.time()
         response = await call_next(request)
         duration = time.time() - start_time
         response.headers["X-Process-Time"] = str(duration)
         return response
 
-# Контекстный менеджер для управления ресурсами при старте/остановке приложения
+def check_dependencies() -> None:
+    """
+    Проверка совместимости версий библиотек
+    """
+    logger.info("Проверка совместимости версий библиотек...")
+    
+    # Необходимые зависимости и их минимальные версии
+    required_dependencies = {
+        "fastapi": "0.109.1",
+        "pydantic": "2.11.3",
+        "sqlalchemy": "2.0.25",
+        "redis": "4.6.0",
+        "uvicorn": "0.27.0",
+        "python-jose": "3.3.0",
+        "pyotp": "2.8.0"
+    }
+    
+    try:
+        installed_packages = {pkg.key: pkg.version for pkg in pkg_resources.working_set}
+        
+        for package, min_version in required_dependencies.items():
+            if package not in installed_packages:
+                logger.warning(f"Библиотека {package} не установлена")
+                continue
+                
+            installed_version = installed_packages[package]
+            installed_parts = [int(part) for part in installed_version.split(".")[:3]]
+            min_parts = [int(part) for part in min_version.split(".")[:3]]
+            
+            if installed_parts < min_parts:
+                logger.warning(
+                    f"Установлена устаревшая версия {package}: {installed_version}. "
+                    f"Рекомендуется использовать не ниже {min_version}"
+                )
+                
+        # Проверка совместимости Pydantic и FastAPI
+        if "pydantic" in installed_packages and "fastapi" in installed_packages:
+            pydantic_version = installed_packages["pydantic"]
+            fastapi_version = installed_packages["fastapi"]
+            
+            pydantic_major = int(pydantic_version.split(".")[0])
+            fastapi_major = int(fastapi_version.split(".")[1])
+            
+            if pydantic_major >= 2 and fastapi_major < 109:
+                logger.warning(
+                    f"Обнаружена возможная проблема совместимости: "
+                    f"Pydantic v{pydantic_version} и FastAPI v{fastapi_version}. "
+                    f"Рекомендуется использовать FastAPI >=0.109.1 с Pydantic v2.11.3"
+                )
+                
+        logger.info("Проверка зависимостей завершена")
+    except Exception as err:
+        logger.error(f"Ошибка при проверке зависимостей: {err}")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -58,6 +110,9 @@ async def lifespan(app: FastAPI):
     """
     try:
         logger.info("Запуск приложения...")
+
+        # Проверка версий библиотек
+        check_dependencies()
 
         if not settings.REDIS_URL:
             logger.error("REDIS_URL не настроен в переменных окружения")
@@ -77,59 +132,86 @@ async def lifespan(app: FastAPI):
         
         logger.info("Приложение завершено")
 
-# Инициализация сервисов
-async def initialize_services():
+async def initialize_services() -> None:
     """
     Инициализация сервисов
     """
-    # Инициализация Redis
-    logger.info("Инициализация Redis...")
+    await _initialize_redis()
+    await _initialize_database()
+    await _initialize_cache()
+
+async def _initialize_redis() -> None:
+    """
+    Инициализация Redis
+    """
     await redis_client.init_redis()
     
-    # Проверяем, что Redis действительно инициализирован
     if not redis_client.get_client():
-        logger.error("Redis не удалось инициализировать")
         raise RuntimeError("Redis не удалось инициализировать")
     
-    logger.info("Redis инициализирован успешно")
-
-    # Инициализация базы данных
+async def _initialize_database() -> None:
+    """
+    Инициализация базы данных
+    """
     try:
-        logger.info("Инициализация базы данных...")
         async with engine.begin() as conn:
-            logger.info("Инициализация таблиц базы данных...")
             await conn.run_sync(Base.metadata.create_all)
-            logger.info("Таблицы базы данных инициализированы")
     except Exception as err:
-        logger.error(f"Ошибка при инициализации базы данных: {err}", exc_info=True)
+        logger.error(f"Ошибка при инициализации базы данных: {err}")
         raise
 
-# Очистка ресурсов при завершении работы
-async def cleanup_services():
+async def _initialize_cache() -> None:
+    """
+    Инициализация FastAPI Cache
+    """
+    try:
+        redis = redis_client.get_client()
+        FastAPICache.init(RedisBackend(redis), prefix="cache")
+    except Exception as err:
+        logger.error(f"Ошибка при инициализации FastAPI Cache: {err}")
+        raise
+
+async def cleanup_services() -> None:
     """
     Очистка ресурсов при завершении работы
     """
+    await _cleanup_redis()
+    await _cleanup_database()
+    await _cleanup_cache()
+
+async def _cleanup_redis() -> None:
+    """
+    Очистка Redis соединения
+    """
     try:
         if redis_client:
-            logger.info("Закрытие соединения с Redis...")
             await redis_client.close_redis()
-            logger.info("Соединение с Redis закрыто")
     except Exception as err:
-        logger.error(f"Ошибка при закрытии Redis: {err}", exc_info=True)
+        logger.error(f"Ошибка при закрытии Redis: {err}")
     
+async def _cleanup_database() -> None:
+    """
+    Очистка соединения с базой данных
+    """
     try:
-        logger.info("Закрытие соединения с базой данных...")
         await engine.dispose()
-        logger.info("Соединение с базой данных закрыто")
     except Exception as err:
-        logger.error(f"Ошибка при закрытии соединения с базой данных: {err}", exc_info=True)
+        logger.error(f"Ошибка при закрытии соединения с базой данных: {err}")
 
-# Создание экземпляра FastAPI
+async def _cleanup_cache() -> None:
+    """
+    Очистка FastAPI Cache
+    """
+    try:
+        if FastAPICache.get_backend():
+            await FastAPICache.clear("cache")
+    except Exception as err:
+        logger.error(f"Ошибка при очистке FastAPI Cache: {err}")
+
 def create_application() -> FastAPI:
     """
     Создание экземпляра FastAPI
     """
-    # Настройка FastAPI
     app = FastAPI(
         title=settings.PROJECT_NAME,
         version=settings.PROJECT_VERSION,
@@ -139,7 +221,17 @@ def create_application() -> FastAPI:
         redoc_url=None if settings.ENVIRONMENT == "production" else "/redoc",
     )
 
-    # Настройка CORS
+    _configure_cors(app)
+    _configure_middleware(app)
+    register_exception_handlers(app)
+    register_routers(app)
+
+    return app
+
+def _configure_cors(app: FastAPI) -> None:
+    """
+    Настройка CORS
+    """
     if settings.CORS_ORIGINS:
         app.add_middleware(
             CORSMiddleware,
@@ -150,33 +242,26 @@ def create_application() -> FastAPI:
         )
         logger.info(f"CORS включен для источников: {settings.CORS_ORIGINS}")
 
-    # Добавление middleware
+def _configure_middleware(app: FastAPI) -> None:
+    """
+    Настройка middleware
+    """
     app.add_middleware(SecurityMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(PrometheusMiddleware)
     app.add_middleware(TimingMiddleware)
 
-    register_exception_handlers(app)
-    register_routers(app)
-
-    return app
-
-# Регистрация обработчиков ошибок
-def register_exception_handlers(app: FastAPI):
+def register_exception_handlers(app: FastAPI) -> None:
     """
     Регистрация обработчиков ошибок
     """
     # Обработчик для валидации данных
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        errors = []
-        for error in exc.errors():
-            message = error["msg"]
-            if message.startswith("Value error, "):
-                message = message[13:]
-            errors.append({
-                "message": message
-            })
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        errors = [
+            {"message": error["msg"][13:] if error["msg"].startswith("Value error, ") else error["msg"]}
+            for error in exc.errors()
+        ]
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"errors": errors}
@@ -184,7 +269,7 @@ def register_exception_handlers(app: FastAPI):
 
     # Обработчик для HTTPException
     @app.exception_handler(HTTPException)
-    async def http_exception_handler(request: Request, exc: HTTPException):
+    async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
         logger.warning(f"HTTP-исключение: {exc.status_code} - {exc.detail}")
         return JSONResponse(
             status_code=exc.status_code,
@@ -194,24 +279,22 @@ def register_exception_handlers(app: FastAPI):
 
     # Обработчик для всех остальных исключений
     @app.exception_handler(Exception)
-    async def generic_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Необработанное исключение: {str(exc)}", exc_info=True)
+    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error(f"Необработанное исключение: {str(exc)}")
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"message": "Внутренняя ошибка сервера"},
         )
 
-# Регистрация роутеров
-def register_routers(app: FastAPI):
+def register_routers(app: FastAPI) -> None:
     """
-    Регистрация роутеров
+    Регистрация роутеров приложения
     """
     from api.v1.routes import api_router
     app.include_router(api_router, prefix=settings.API_PREFIX)
 
 app = create_application()
 
-# --- Запуск через Uvicorn ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

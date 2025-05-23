@@ -1,25 +1,25 @@
-# backend/core/security/password.py
-
 from passlib.context import CryptContext
-import re
 from datetime import datetime, timedelta
 import random
 import string
+from typing import Tuple, List
+
 from core.config.config import settings
-# Класс для работы с паролями
+from core.models.user import User
+from core.extensions.logger import logger
+
 class PasswordManager:
     """
     Класс для работы с паролями
-    
-    :`hash_password`: Хеширование пароля с использованием `bcrypt`
-    :`verify_password`: Проверка пароля на соответствие `hashed_password`
-    :`validate_password`: Валидация пароля по требованиям безопасности
-    :`generate_random_password`: Генерация случайного пароля
-    :`check_brute_force`: Проверка блокировки
-    :`handle_failed_login`: Обработка неудачных попыток входа
-    :`reset_failed_attempts`: Сброс неудачных попыток
+    Класс выполняет следующие функции:
+    - Хеширование пароля с использованием bcrypt
+    - Проверка password на соответствие hashed_password
+    - Расширенная валидация пароля с оценкой сложности
+    - Генерация случайного пароля
+    - Проверка блокировки
+    - Обработка неудачных попыток входа
+    - Сброс неудачных попыток
     """
-
     def __init__(self):
         self.pwd_context = CryptContext(
             schemes=["bcrypt"],
@@ -30,88 +30,137 @@ class PasswordManager:
         self.max_failed_attempts = settings.MAX_FAILED_ATTEMPTS
         self.lockout_duration = timedelta(minutes=settings.LOCKOUT_DURATION)
 
-    # Хеширование пароля с использованием bcrypt
+        # Предопределенные наборы символов для генерации пароля
+        self.uppercase_letters = string.ascii_uppercase
+        self.lowercase_letters = string.ascii_lowercase
+        self.digits = string.digits
+        self.special_chars = "!@#$%^&*(),.?\":{}|<>"
+
     def hash_password(self, password: str) -> str:
         """
-        Хеширование пароля с использованием `bcrypt`
-        :param `password`: Пароль в виде строки
-        :return: Хешированный пароль
+        Хеширование пароля с использованием bcrypt\n
+        `password` - Пароль для хеширования\n
+        Возвращает хешированный пароль
         """
-        return self.pwd_context.hash(password)
+        try:
+            return self.pwd_context.hash(password)
+        except Exception as err:
+            logger.error(f"Ошибка при хешировании пароля: {err}")
+            raise ValueError("Не удалось хешировать пароль")
 
-    # Проверка пароля
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
-        Проверка password на соответствие hashed_password
-        :param `plain_password`: Пароль в виде строки
-        :param `hashed_password`: Хешированный пароль
-        :return: True, если пароль верный, иначе False
-        """
-        return self.pwd_context.verify(plain_password, hashed_password)
+        Проверка password на соответствие hashed_password\n
+        `plain_password` - Пароль в виде строки\n
+        `hashed_password` - Хешированный пароль\n
+        Возвращает True, если пароль верный, иначе False
+        """            
+        try:
+            return self.pwd_context.verify(plain_password, hashed_password)
+        except Exception as err:
+            logger.error(f"Ошибка при проверке пароля: {err}")
+            return False
 
-    # Валидация пароля по требованиям безопасности
-    def validate_password(self, password: str) -> tuple[bool, list[str]]:
+    def validate_password(self, password: str) -> Tuple[bool, List[str]]:
         """
-        Расширенная валидация пароля с оценкой сложности
-        :param `password`: Пароль в виде строки
-        :return: Кортеж из булева значения и списка ошибок
+        Расширенная валидация пароля с оценкой сложности\n
+        `password` - Пароль в виде строки\n
+        Возвращает кортеж из булева значения и списка ошибок
         """
-        errors = []
-        
-        if len(password) < self.min_length:
-            errors.append(f"Пароль должен быть не менее {self.min_length} символов")
-        
-        if not re.search(r"[A-Z]", password):
-            errors.append("Пароль должен содержать хотя бы одну заглавную букву")
-        
-        if not re.search(r"[a-z]", password):
-            errors.append("Пароль должен содержать хотя бы одну строчную букву")
-        
-        if not re.search(r"\d", password):
-            errors.append("Пароль должен содержать хотя бы одну цифру")
-        
-        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-            errors.append("Пароль должен содержать хотя бы один специальный символ")
+        if not password:
+            return False, ["Пароль не может быть пустым"]
+            
+        try:
+            errors = []
+            
+            if len(password) < self.min_length:
+                errors.append(f"Пароль должен быть не менее {self.min_length} символов")
+            
+            if not any(char in self.uppercase_letters for char in password):
+                errors.append("Пароль должен содержать хотя бы одну заглавную букву")
+            
+            if not any(char in self.lowercase_letters for char in password):
+                errors.append("Пароль должен содержать хотя бы одну строчную букву")
+            
+            if not any(char in self.digits for char in password):
+                errors.append("Пароль должен содержать хотя бы одну цифру")
+            
+            if not any(char in self.special_chars for char in password):
+                errors.append("Пароль должен содержать хотя бы один специальный символ")
 
-        return len(errors) == 0, errors
+            return len(errors) == 0, errors
+        except Exception as err:
+            logger.error(f"Ошибка при валидации пароля: {err}")
+            return False, ["Ошибка при валидации пароля"]
 
-    # Генерация случайного пароля
     def generate_random_password(self, length: int = 12) -> str:
         """
-        Генерация случайного пароля
-        :param `length`: Длина пароля
-        :return: Случайный пароль
+        Генерация случайного пароля\n
+        `length` - Длина пароля\n
+        Возвращает случайный пароль, соответствующий требованиям безопасности
         """
-        return ''.join(random.choices(string.ascii_letters + string.digits + string.punctuation, k=length))
+        if length < self.min_length:
+            length = self.min_length
+            
+        try:
+            # Гарантируем наличие всех типов символов
+            password = [
+                random.choice(self.uppercase_letters),
+                random.choice(self.lowercase_letters),
+                random.choice(self.digits),
+                random.choice(self.special_chars)
+            ]
+            
+            # Добавляем остальные символы
+            all_chars = self.uppercase_letters + self.lowercase_letters + self.digits + self.special_chars
+            password.extend(random.choices(all_chars, k=length-4))
+            return ''.join(random.shuffle(password))
+        
+        except Exception as err:
+            logger.error(f"Ошибка при генерации случайного пароля: {err}")
+            raise ValueError("Не удалось сгенерировать пароль")
     
-    # Проверка блокировки
-    async def check_brute_force(self, user) -> bool:
+    async def check_brute_force(self, user: User) -> bool:
         """
-        Проверка блокировки
-        :param `user`: Пользователь
-        :return: True, если пользователь заблокирован, иначе False
+        Проверка блокировки\n
+        `user` - Пользователь\n
+        Возвращает True, если пользователь заблокирован, иначе False
         """
-        if user.locked_until and user.locked_until > datetime.utcnow():
-            return True
-        return False
+        try:
+            if user.locked_until and user.locked_until > datetime.utcnow():
+                return True
+            elif user.locked_until:
+                user.failed_login_attempts = 0
+                user.locked_until = None
+            return False
+        except Exception as err:
+            logger.error(f"Ошибка при проверке блокировки: {err}")
+            return False
 
-    # Обработка неудачных попыток входа
-    async def handle_failed_login(self, user) -> None:
+    async def handle_failed_login(self, user: User) -> None:
         """
-        Обработка неудачных попыток входа
-        :param `user`: Пользователь
+        Обработка неудачных попыток входа\n
+        `user` - Пользователь\n
         """
-        user.failed_login_attempts += 1
-        if user.failed_login_attempts >= self.max_failed_attempts:
-            user.locked_until = datetime.utcnow() + self.lockout_duration
+        try:
+            user.failed_login_attempts += 1
+            if user.failed_login_attempts >= self.max_failed_attempts:
+                user.locked_until = datetime.utcnow() + self.lockout_duration
+                logger.warning(f"Пользователь {user.login} заблокирован до {user.locked_until}")
+        except Exception as err:
+            logger.error(f"Ошибка при обработке неудачной попытки входа: {err}")
+            raise ValueError("Не удалось обработать неудачную попытку входа")
 
-    # Сброс неудачных попыток
-    async def reset_failed_attempts(self, user) -> None:
+    async def reset_failed_attempts(self, user: User) -> None:
         """
-        Сброс неудачных попыток
-        :param `user`: Пользователь
+        Сброс неудачных попыток\n
+        `user` - Пользователь
         """
-        user.failed_login_attempts = 0
-        user.locked_until = None
+        try:
+            user.failed_login_attempts = 0
+            user.locked_until = None
+        except Exception as err:
+            logger.error(f"Ошибка при сбросе неудачных попыток: {err}")
+            raise ValueError("Не удалось сбросить неудачные попытки")
 
 password_manager = PasswordManager()

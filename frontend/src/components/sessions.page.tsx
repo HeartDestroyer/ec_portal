@@ -185,7 +185,7 @@ const SessionsPage: React.FC = () => {
                     )}
 
                     {!record.is_current && !record.is_active && (
-                        <span>Неактивна</span>
+                        <span> - </span>
                     )}
                 </>
             ),

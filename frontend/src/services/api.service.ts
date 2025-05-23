@@ -20,11 +20,14 @@ class ApiService {
             withCredentials: true
         });
 
+        /** refreshInProgress для того чтобы не было ошибки при одновременном обновлении токенов, защита от двойного запроса на обновление токенов */
+        let refreshInProgress = null as any;
+
         this.instance.interceptors.response.use(
             (response) => response,
             async (error: AxiosError) => {
                 const originalRequest = error.config as any;
-                
+
                 const isAuthRequest =
                     originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.LOGIN) ||
                     originalRequest.url?.includes(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
@@ -32,13 +35,17 @@ class ApiService {
                 if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
                     originalRequest._retry = true;
                     try {
-                        // Обновления токенов, если access токен истек, но refresh токен ещё жив
-                        await this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
+                        if (!refreshInProgress) {
+                            refreshInProgress = await this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
+                        }
+                        await refreshInProgress;
                         return this.instance(originalRequest);
                     } catch (refreshError) {
                         if (window.location.pathname !== APP_CONFIG.ROUTES.PUBLIC.LOGIN) {
                             window.location.href = APP_CONFIG.ROUTES.PUBLIC.LOGIN;
                         }
+                    } finally {
+                        refreshInProgress = null;
                     }
                 }
                 return Promise.reject(error);

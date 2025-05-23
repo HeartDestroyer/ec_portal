@@ -1,16 +1,13 @@
-# backend/core/extensions/logger.py
-
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+import json
 import logging
 import sys
 from pathlib import Path
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-import json
-import collections.abc
 from datetime import datetime
 from typing import Any, Dict
+
 from core.config.config import settings
 
-# Кастомный форматтер для логов в JSON формате
 class CustomJsonFormatter(logging.Formatter):
     """
     Кастомный форматтер для логов в JSON формате
@@ -24,10 +21,9 @@ class CustomJsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """
-        Форматирует запись лога в JSON
-        
-        :param record: Запись лога
-        :return: str: Отформатированная запись в JSON
+        Форматирует запись лога в JSON\n
+        `record` - Запись лога\n
+        Возвращает отформатированную запись в JSON
         """
         log_object: Dict[str, Any] = {
             'timestamp': datetime.fromtimestamp(record.created).isoformat(),
@@ -68,7 +64,6 @@ class CustomJsonFormatter(logging.Formatter):
         try:
             return json.dumps(log_object, ensure_ascii=False)
         except Exception as e:
-            # Если не удалось сериализовать, возвращаем базовую информацию
             return json.dumps({
                 'timestamp': log_object['timestamp'],
                 'level': log_object['level'],
@@ -81,18 +76,11 @@ class Logger:
     Класс для настройки и управления логированием
     """
     def __init__(self):
-        # Создаем директорию для логов если её нет
         self.logs_dir = Path(settings.LOGS_DIR)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
-
-        # Инициализируем логгер
         self.logger = logging.getLogger('app')
         self.logger.setLevel(settings.LOG_LEVEL)
-
-        # Очищаем существующие обработчики
         self.logger.handlers.clear()
-
-        # Добавляем обработчики
         self._setup_handlers()
 
     def _setup_handlers(self) -> None:
@@ -101,7 +89,6 @@ class Logger:
         """
         handlers = []
 
-        # Консольный обработчик
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(CustomJsonFormatter())
         handlers.append(console_handler)
@@ -145,17 +132,14 @@ class Logger:
     def get_logger(self) -> logging.Logger:
         """
         Возвращает настроенный логгер
-        
-        :return: logging.Logger: Настроенный логгер
         """
         return self.logger
 
     @staticmethod
     def setup_uvicorn_logging() -> Dict[str, Any]:
         """
-        Настройка логирования для Uvicorn
-        
-        :return: Dict[str, Any]: Конфигурация логирования для Uvicorn
+        Настройка логирования для Uvicorn\n
+        Возвращает конфигурацию логирования для Uvicorn
         """
         return {
             "version": 1,
@@ -194,5 +178,4 @@ class Logger:
             }
         }
 
-# Создаем глобальный экземпляр логгера
 logger = Logger().get_logger()

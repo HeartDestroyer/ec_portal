@@ -1,5 +1,3 @@
-# backend/core/models/group.py
-
 import uuid
 from datetime import datetime
 from typing import List, TYPE_CHECKING, Optional
@@ -9,47 +7,21 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from core.models.base import Base
 
 if TYPE_CHECKING:
+    from core.models.telegram import ChannelRule
     from .user import User
 
-# Модель группы
 class Group(Base):
-    """
-    Модель Группы (или отдела внутри департамента)
-    """
     __tablename__ = 'groups'
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, doc="ID группы")
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, doc="Название группы")
     description: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, doc="Описание группы")
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey('groups.id'), nullable=True, doc="ID родительской группы")
 
-    # Связи
-    users: Mapped[List["User"]] = relationship("User", back_populates="group")
-    parent: Mapped["Group | None"] = relationship("Group", back_populates="children", remote_side=[id])
-    children: Mapped[List["Group"]] = relationship("Group", back_populates="parent")
+    users: Mapped[List["User"]] = relationship("User", back_populates="group", doc="Список пользователей, относящихся к группе")
+    channel_tg_rules: Mapped[List["ChannelRule"]] = relationship("ChannelRule", back_populates="group", doc="Список правил для каналов Telegram")
+    parent: Mapped["Group | None"] = relationship("Group", back_populates="children", remote_side=[id], doc="Родительская группа")
+    children: Mapped[List["Group"]] = relationship("Group", back_populates="parent", doc="Список дочерних групп")
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Сериализация модели группы в словарь
-    def to_dict(self):
-        """
-        Сериализация модели группы в словарь
-        """
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "description": self.description,
-            "parent_id": str(self.parent_id) if self.parent_id else None
-        }
-    
-    # Сериализация модели группы в словарь с публичными данными
-    def to_public_dict(self):
-        """
-        Сериализация модели группы в словарь с публичными данными
-        """
-        return {
-            "id": str(self.id),
-            "name": self.name,
-            "description": self.description
-        }
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, doc="Дата создания группы")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, doc="Дата обновления группы")
