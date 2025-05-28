@@ -2,7 +2,7 @@ from pydantic import BaseModel, HttpUrl, field_validator, Field
 from typing import Optional, List
 from datetime import datetime
 
-from core.models.telegram import RuleType, City, Gender
+from models.telegram import RuleType, City, Gender
 
 # Схема базового правила для ТГ группы
 class ChannelRuleBase(BaseModel):

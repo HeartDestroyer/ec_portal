@@ -1,10 +1,12 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
+# backend/api/v1/auth/schemas/response_schemas.py - Схемы для ответов на запросы
+
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional
 from datetime import date, datetime
 from pydantic.types import UUID4
 import uuid
+
 from core.models.user import Gender, Company, City, Role, AdditionalRole
-from core.security.password import password_manager
 
 BASE_CONFIG = ConfigDict(
     from_attributes=True,
@@ -14,70 +16,18 @@ BASE_CONFIG = ConfigDict(
     }
 )
 
-class UserCreate(BaseModel):
-    """
-    Схема для создания пользователя из формы регистрации
-
-    """
-    model_config = BASE_CONFIG
-
-    login: str = Field(..., min_length=3, max_length=80, description="Имя пользователя (уникальное)")
-    email: EmailStr = Field(..., description="Почта пользователя (уникальная)")
-    name: str = Field(..., max_length=128, description="Полное имя")
-    password: str = Field(..., description="Пароль")
-    phone: Optional[str] = Field(None, max_length=25, description="Номер телефона")
-    
-    @field_validator('password')
-    def validate_password(cls, v: str) -> str:
-        is_valid, errors = password_manager.validate_password(v)
-        if not is_valid:
-            raise ValueError("\n".join(errors))
-        return v
-
-    @field_validator('login')
-    def validate_login(cls, v: str) -> str:
-        if not v.isalnum():
-            raise ValueError('Логин должен содержать только буквы и цифры')
-        return v
-
-class UserLogin(BaseModel):
-    """
-    Схема для аутентификации пользователя из формы входа
-    """
-    model_config = BASE_CONFIG
-    
-    login_or_email: str = Field(..., description="Имя пользователя или почта")
-    password: str = Field(..., description="Пароль")
-
-class RequestPasswordReset(BaseModel):
-    """
-    Схема для запроса сброса пароля из формы запроса сброса пароля
-    """
-    model_config = BASE_CONFIG
-    
-    email: EmailStr = Field(..., description="Почта пользователя")
-
-class ResetPassword(BaseModel):
-    """
-    Схема для сброса пароля из формы сброса пароля
-    """
-    model_config = BASE_CONFIG
-    
-    token: str = Field(..., description="Токен из письма")
-    new_password: str = Field(..., min_length=8, description="Новый пароль")
-
-    @field_validator('new_password')
-    def validate_password(cls, v: str) -> str:
-        is_valid, errors = password_manager.validate_password(v)
-        if not is_valid:
-            error_message = "Требования к паролю не выполнены:\n" + "\n".join(errors)
-            raise ValueError(error_message)
-        return v
-
 class UserPublicProfile(BaseModel):
     """
     Схема для публичной информации о пользователе\n
-    Для получения публичной информации о пользователе - например при просмотре групп / департаментов
+    Для получения публичной информации о пользователе - например при просмотре групп / департаментов\n
+        - `email` - Почта пользователя
+        - `name` - Имя пользователя
+        - `phone` - Номер телефона пользователя
+        - `photo_url` - URL фото пользователя
+        - `photo_url_small` - URL уменьшенного фото пользователя
+        - `work_position` - Должность пользователя
+        - `date_employment` - Дата трудоустройства пользователя
+        - `telegram_id` - ID пользователя в ТГ
     """
     model_config = BASE_CONFIG
     
@@ -93,7 +43,31 @@ class UserPublicProfile(BaseModel):
 class UserPrivateProfile(BaseModel):
     """
     Схема для приватной информации о пользователе\n
-    Для получения приватной информации о пользователе - например при просмотре своего профиля
+        - `id` - ID пользователя
+        - `login` - Логин пользователя
+        - `email` - Почта пользователя
+        - `name` - Имя пользователя
+        - `phone` - Номер телефона пользователя
+        - `department_id` - ID отдела пользователя
+        - `group_id` - ID группы пользователя
+        - `work_position` - Должность пользователя
+        - `date_employment` - Дата трудоустройства пользователя
+        - `city` - Город пользователя
+        - `date_birthday` - Дата рождения пользователя
+        - `company` - Компания пользователя
+        - `qr_code_vcard` - QR код для визитки пользователя
+        - `user_email` - Рабочая почта пользователя
+        - `telegram_id` - ID пользователя в ТГ
+        - `gender` - Пол пользователя
+        - `photo_url` - URL фото пользователя
+        - `bio` - Доп. информация о пользователе
+        - `role` - Роль пользователя
+        - `additional_role` - Дополнительная роль пользователя
+        - `updated_at` - Дата обновления пользователя
+        - `last_login` - Дата последнего входа пользователя
+        - `failed_login_attempts` - Количество неудачных попыток входа пользователя
+        - `locked_until` - Дата блокировки пользователя
+        - `last_password_change` - Дата последнего изменения пароля пользователя
     """
     model_config = BASE_CONFIG
     
@@ -125,8 +99,8 @@ class UserPrivateProfile(BaseModel):
 
 class CSRFTokenResponse(BaseModel):
     """
-    Схема для ответа на запрос CSRF токена\n
-    Для получения CSRF токена
+    Схема для ответа на запрос CSRF токена
+        - `csrf_token` - CSRF токен для защиты от CSRF атак
     """
     model_config = BASE_CONFIG
     

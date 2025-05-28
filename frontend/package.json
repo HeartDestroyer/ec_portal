@@ -21,7 +21,8 @@
         "react-dom": "^18.2.0",
         "react-router-dom": "^7.5.2",
         "simplebar": "^6.3.1",
-        "simplebar-react": "^3.3.1"
+        "simplebar-react": "^3.3.1",
+        "web-push": "^3.6.7"
     },
     "devDependencies": {
         "@eslint/js": "^9.22.0",

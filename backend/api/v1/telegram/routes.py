@@ -9,7 +9,7 @@ from .services import TelegramService
 from api.v1.dependencies import get_current_user_payload, get_db, get_redis, require_admin_roles, jwt_handler
 from api.v1.schemas import MessageResponse, TokenPayload
 from core.extensions.logger import logger
-from core.models.user import User
+from models.user import User
 
 telegram_router = APIRouter(prefix="/api/v1/telegram", tags=["Управление ТГ-группами"])
 

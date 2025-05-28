@@ -5,7 +5,7 @@ import string
 from typing import Tuple, List
 
 from core.config.config import settings
-from core.models.user import User
+from models.user import User
 from core.extensions.logger import logger
 
 class PasswordManager:

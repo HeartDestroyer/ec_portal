@@ -11,14 +11,17 @@ from fastapi_cache import FastAPICache
 from fastapi_cache.backends.redis import RedisBackend
 
 from core.config.config import settings
-from core.models.base import Base
+from models.base import Base
 from core.extensions.database import engine
 from core.extensions.redis import redis_client
+from core.websocket.websocket import websocket_manager
 from core.extensions.logger import logger
 from core.middleware.rate_limiter import RateLimitMiddleware
 from core.middleware.security import SecurityMiddleware
 from core.middleware.metrics import PrometheusMiddleware
 
+
+# Wrapper для асинхронных итераторов, обеспечивающий правильное закрытие
 class AsyncIteratorWrapper:
     """
     Wrapper для асинхронных итераторов, обеспечивающий правильное закрытие
@@ -38,6 +41,7 @@ class AsyncIteratorWrapper:
     def add_callback(self, callback: Callable) -> None:
         self._close_callbacks.append(callback)
 
+# Middleware для измерения времени выполнения запросов
 class TimingMiddleware(BaseHTTPMiddleware):
     """
     Middleware для измерения времени выполнения запросов
@@ -49,7 +53,8 @@ class TimingMiddleware(BaseHTTPMiddleware):
         response.headers["X-Process-Time"] = str(duration)
         return response
 
-def check_dependencies() -> None:
+# Проверка совместимости версий библиотек
+async def check_dependencies() -> None:
     """
     Проверка совместимости версий библиотек
     """
@@ -63,7 +68,8 @@ def check_dependencies() -> None:
         "redis": "4.6.0",
         "uvicorn": "0.27.0",
         "python-jose": "3.3.0",
-        "pyotp": "2.8.0"
+        "pyotp": "2.8.0",
+        "websockets": "15.0.1"
     }
     
     try:
@@ -103,6 +109,7 @@ def check_dependencies() -> None:
     except Exception as err:
         logger.error(f"Ошибка при проверке зависимостей: {err}")
 
+# Управление жизненным циклом приложения
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -111,13 +118,11 @@ async def lifespan(app: FastAPI):
     try:
         logger.info("Запуск приложения...")
 
-        # Проверка версий библиотек
-        check_dependencies()
-
         if not settings.REDIS_URL:
             logger.error("REDIS_URL не настроен в переменных окружения")
             raise ValueError("REDIS_URL не настроен")
 
+        await check_dependencies()
         await initialize_services()
 
         logger.info("Приложение запущено")
@@ -129,16 +134,18 @@ async def lifespan(app: FastAPI):
     finally:
         logger.info("Закрытие приложения...")
         await cleanup_services()
-        
         logger.info("Приложение завершено")
 
+
+# Инициализация сервисов приложения
 async def initialize_services() -> None:
     """
-    Инициализация сервисов
+    Инициализация сервисов приложения
     """
     await _initialize_redis()
     await _initialize_database()
     await _initialize_cache()
+    # await _initialize_websocket()
 
 async def _initialize_redis() -> None:
     """
@@ -157,7 +164,7 @@ async def _initialize_database() -> None:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except Exception as err:
-        logger.error(f"Ошибка при инициализации базы данных: {err}")
+        logger.error(f"Неожиданная ошибка при инициализации базы данных: {err}")
         raise
 
 async def _initialize_cache() -> None:
@@ -168,16 +175,30 @@ async def _initialize_cache() -> None:
         redis = redis_client.get_client()
         FastAPICache.init(RedisBackend(redis), prefix="cache")
     except Exception as err:
-        logger.error(f"Ошибка при инициализации FastAPI Cache: {err}")
+        logger.error(f"Неожиданная ошибка при инициализации FastAPI Cache: {err}")
         raise
 
+async def _initialize_websocket() -> None:
+    """
+    Инициализация WebSocket менеджера
+    """
+    try:
+        await websocket_manager.initialize()
+        logger.info("WebSocket менеджер инициализирован")
+    except Exception as err:
+        logger.error(f"Неожиданная ошибка при инициализации WebSocket менеджера: {err}")
+        raise
+
+
+# Очистка ресурсов при завершении работы
 async def cleanup_services() -> None:
     """
     Очистка ресурсов при завершении работы
     """
+    # await _cleanup_websocket()
+    await _cleanup_cache()
     await _cleanup_redis()
     await _cleanup_database()
-    await _cleanup_cache()
 
 async def _cleanup_redis() -> None:
     """
@@ -187,7 +208,7 @@ async def _cleanup_redis() -> None:
         if redis_client:
             await redis_client.close_redis()
     except Exception as err:
-        logger.error(f"Ошибка при закрытии Redis: {err}")
+        logger.error(f"Неожиданная ошибка при закрытии Redis: {err}")
     
 async def _cleanup_database() -> None:
     """
@@ -196,18 +217,43 @@ async def _cleanup_database() -> None:
     try:
         await engine.dispose()
     except Exception as err:
-        logger.error(f"Ошибка при закрытии соединения с базой данных: {err}")
+        logger.error(f"Неожиданная ошибка при закрытии соединения с базой данных: {err}")
 
 async def _cleanup_cache() -> None:
     """
     Очистка FastAPI Cache
     """
     try:
-        if FastAPICache.get_backend():
-            await FastAPICache.clear("cache")
+        backend = FastAPICache.get_backend()
+        if backend is not None:
+            await backend.clear("cache")
+    except RuntimeError as err:
+        pass
     except Exception as err:
-        logger.error(f"Ошибка при очистке FastAPI Cache: {err}")
+        logger.error(f"Неожиданная ошибка при очистке кэша: {err}")
 
+async def _cleanup_websocket() -> None:
+    """
+    Очистка WebSocket менеджера
+    """
+    try:
+        if websocket_manager:
+            await websocket_manager.stop_redis_listener()
+            # Отключаем всех клиентов
+            for connection_id in list(websocket_manager.connections.keys()):
+                connection_info = websocket_manager.connections[connection_id]
+                try:
+                    await websocket_manager.disconnect(connection_info.websocket, "server_shutdown")
+                except Exception as disconnect_err:
+                    logger.warning(f"Ошибка при отключении {connection_id}: {disconnect_err}")
+            websocket_manager = None
+            logger.info("WebSocket менеджер успешно остановлен")
+
+    except Exception as err:
+        logger.error(f"Неожиданная ошибка при очистке WebSocket менеджера: {err}")
+
+
+# Создание экземпляра FastAPI
 def create_application() -> FastAPI:
     """
     Создание экземпляра FastAPI
@@ -251,6 +297,8 @@ def _configure_middleware(app: FastAPI) -> None:
     app.add_middleware(PrometheusMiddleware)
     app.add_middleware(TimingMiddleware)
 
+
+# Регистрация обработчиков ошибок
 def register_exception_handlers(app: FastAPI) -> None:
     """
     Регистрация обработчиков ошибок
@@ -286,9 +334,10 @@ def register_exception_handlers(app: FastAPI) -> None:
             content={"message": "Внутренняя ошибка сервера"},
         )
 
+# Регистрация маршрутов приложения
 def register_routers(app: FastAPI) -> None:
     """
-    Регистрация роутеров приложения
+    Регистрация маршрутов приложения
     """
     from api.v1.routes import api_router
     app.include_router(api_router, prefix=settings.API_PREFIX)

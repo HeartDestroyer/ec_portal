@@ -39,6 +39,7 @@ class ApiService {
                             refreshInProgress = await this.instance.post(API_CONFIG.ENDPOINTS.AUTH.REFRESH);
                         }
                         await refreshInProgress;
+                        await new Promise(res => setTimeout(res, 2000));
                         return this.instance(originalRequest);
                     } catch (refreshError) {
                         if (window.location.pathname !== APP_CONFIG.ROUTES.PUBLIC.LOGIN) {

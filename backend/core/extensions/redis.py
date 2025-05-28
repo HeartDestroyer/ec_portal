@@ -7,19 +7,20 @@ from core.extensions.logger import logger
 
 
 class RedisClient:
-    """    
+    """
+    Класс для работы с Redis\n
     Методы класса:
-    - init_redis() - Инициализация асинхронного клиента Redis
-    - close_redis() - Закрытие пула соединений Redis
-    - get_client() - Получение активного клиента Redis
-    - get_client_with_retry() - Получение активного клиента Redis с повторными попытками подключения
-    - set() - Установка значения в Redis (без атомарности)
-    - atomic_set_token() - Установка значения в Redis атомарно (Защита от дублирования токенов)
-    - get() - Получение значения из Redis
-    - delete() - Удаление значения из Redis
+        - `init_redis` - Инициализация асинхронного клиента Redis
+        - `close_redis` - Закрытие пула соединений Redis
+        - `get_client` - Получение активного клиента Redis
+        - `get_client_with_retry` - Получение активного клиента Redis с повторными попытками подключения
+        - `set` - Установка значения в Redis (без атомарности)
+        - `atomic_set_token` - Установка значения в Redis атомарно (Защита от дублирования токенов)
+        - `get` - Получение значения из Redis
+        - `delete` - Удаление значения из Redis
 
     Функции класса:
-    - get_redis() - Получение активного клиента Redis
+        - `get_redis` - Получение активного клиента Redis
     """
     def __init__(self):
         self._redis: Optional[Redis] = None
@@ -156,7 +157,8 @@ redis_client = RedisClient()
 
 async def get_redis() -> Optional[Redis]:
     """
-    Получает активный клиент Redis
+    Получает активный клиент Redis\n
+    Возвращает активный клиент Redis или None
     """
     client = redis_client.get_client()
     if client is None:

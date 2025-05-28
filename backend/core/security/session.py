@@ -10,8 +10,8 @@ from fastapi_cache.coder import JsonCoder
 import json
 
 from core.security.jwt import JWTHandler
-from core.models.user import User
-from core.models.session import Session
+from models.user import User
+from models.session import Session
 from core.extensions.logger import logger
 from core.config.config import settings
 from api.v1.session.schemas import SessionFilter, SessionsPage, SessionResponse, UserAgentInfo

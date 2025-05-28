@@ -16,12 +16,12 @@ const SessionsPage: React.FC = () => {
     const [sessionsData, setSessionsData] = useState<SessionsPage>({
         total: 0,
         page: 1,
-        page_size: 20,
+        page_size: 12,
         sessions: []
     });
     const [filters, setFilters] = useState<SessionFilter>({
         page: 1,
-        page_size: 20,
+        page_size: 12,
         user_name: '',
         is_active: undefined
     });

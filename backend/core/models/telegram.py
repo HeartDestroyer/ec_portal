@@ -7,12 +7,12 @@ from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlalchemy import DateTime, String, Enum, BigInteger
 
-from core.models.base import Base
-from core.models.department import Department
-from core.models.group import Group
+from models.base import Base
+from models.department import Department
+from models.group import Group
 
 if TYPE_CHECKING:
-    from core.models.user import User
+    from models.user import User
 
 class RuleType(enum.Enum):
     BASE = 'base'

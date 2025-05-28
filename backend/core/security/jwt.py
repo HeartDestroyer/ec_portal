@@ -12,7 +12,7 @@ from functools import wraps
 from core.config.config import settings
 from core.extensions.redis import get_redis, redis_client
 from core.extensions.database import get_db 
-from core.models.user import User
+from models.user import User
 from core.extensions.logger import logger
 from api.v1.schemas import TokenPayload, Tokens
 

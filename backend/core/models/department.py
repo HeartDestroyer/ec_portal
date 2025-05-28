@@ -4,11 +4,11 @@ from typing import List, TYPE_CHECKING, Optional
 from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
-from core.models.base import Base
+from models.base import Base
 
 if TYPE_CHECKING:
-    from core.models.telegram import ChannelRule
-    from .user import User
+    from models.telegram import ChannelRule
+    from models.user import User
 
 class Department(Base):
     __tablename__ = 'departments'

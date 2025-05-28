@@ -9,9 +9,9 @@ from enum import Enum
 
 from api.v1.auth.services import AuthenticationService
 from api.v1.dependencies import settings
-from core.models.user import User
-from core.models.department import Department
-from core.models.group import Group
+from models.user import User
+from models.department import Department
+from models.group import Group
 from .schemas import (
     UserFilter, UserPrivateProfile, UserPublicProfile, UserProfilesResponse, UserProfileResponse, UserUpdateCombined
 )

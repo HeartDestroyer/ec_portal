@@ -26,6 +26,13 @@ export const API_CONFIG = {
         },
         CACHE: {
             CLEAR: '/api/v1/cache/clear'
+        },
+        NOTIFICATIONS: {
+            NOTIFICATIONS: '/api/v1/notifications',
+            VAPID_KEY: '/api/v1/notifications/vapid-key',
+            SUBSCRIBE: '/api/v1/notifications/subscribe',
+            UNSUBSCRIBE: '/api/v1/notifications/unsubscribe',
+            SEND: '/api/v1/notifications/send',
         }
     },
 } as const;

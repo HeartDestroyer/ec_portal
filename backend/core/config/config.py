@@ -19,6 +19,12 @@ class BaseSettingsClass(BaseSettings):
     EMPLOYEE_ROLES: List[str] = Field(["superadmin", "admin", "leader", "employee"], env="EMPLOYEE_ROLES", description="Роли сотрудников")
     AUTHENTICATED_ROLES: List[str] = Field(["superadmin", "admin", "leader", "employee", "guest"], env="AUTHENTICATED_ROLES", description="Роли аутентифицированных пользователей")
     MAX_ACTIVE_SESSIONS_PER_USER: int = Field(5, env="MAX_ACTIVE_SESSIONS_PER_USER", description="Максимальное количество активных сессий для пользователя")
+    DEVELOPER_TG: str = Field("https://t.me/XopXeyLalalei", env="DEVELOPER_TG", description="Телеграм разработчика")
+    
+    # Настройки push-уведомлений
+    VAPID_PRIVATE_KEY: str = Field(..., env="VAPID_PRIVATE_KEY", description="Секретный ключ для push-уведомлений")
+    VAPID_PUBLIC_KEY: str = Field(..., env="VAPID_PUBLIC_KEY", description="Публичный ключ для push-уведомлений")
+    VAPID_EMAIL: str = Field(..., env="VAPID_EMAIL", description="Почта для push-уведомлений")
 
     # Сервер
     SERVER_HOST: str = Field("127.0.0.1", env="SERVER_HOST", description="Адрес сервера")
@@ -102,6 +108,15 @@ class BaseSettingsClass(BaseSettings):
     # Настройки Битрикс
     BITRIX_WEBHOOK_URL: str = Field(..., env="BITRIX_WEBHOOK_URL", description="URL вебхука Битрикс")
 
+    # Настройки WebSocket
+    WEBSOCKET_PING_INTERVAL: int = Field(20, env="WEBSOCKET_PING_INTERVAL", description="Интервал отправки ping в секундах")
+    WEBSOCKET_PING_TIMEOUT: int = Field(20, env="WEBSOCKET_PING_TIMEOUT", description="Таймаут ожидания pong в секундах")
+    WEBSOCKET_CLOSE_TIMEOUT: int = Field(20, env="WEBSOCKET_CLOSE_TIMEOUT", description="Таймаут закрытия соединения в секундах")
+    WEBSOCKET_MAX_MESSAGE_SIZE: int = Field(1024 * 1024, env="WEBSOCKET_MAX_MESSAGE_SIZE", description="Максимальный размер сообщения в байтах")
+    WEBSOCKET_MAX_QUEUE_SIZE: int = Field(64, env="WEBSOCKET_MAX_QUEUE_SIZE", description="Максимальный размер очереди сообщений")
+    WEBSOCKET_MAX_CONNECTIONS_PER_USER: int = Field(10, env="WEBSOCKET_MAX_CONNECTIONS_PER_USER", description="Максимальное количество подключений на пользователя")
+    WEBSOCKET_CONNECTION_TIMEOUT: int = Field(300, env="CONNECTION_TIMEOUT", description="Время ожидания соединения в секундах")
+
     class Config:
         env_file = ".env" 
         env_file_encoding = "utf-8"
@@ -116,8 +131,11 @@ class DevelopmentSettings(BaseSettingsClass):
     CORS_ORIGINS: List[str] = ["http://127.0.0.1:5173"]
     FRONTEND_URL: str = "http://127.0.0.1:5173"
 
-    # Проверка обязательных переменных окружения
-    @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')
+    @field_validator(
+        "SECRET_KEY", "VAPID_PRIVATE_KEY", "VAPID_PUBLIC_KEY", "JWT_SECRET_KEY", "JWT_ALGORITHM", "DATABASE_URL", "REDIS_URL",
+        "SECURITY_PASSWORD_SALT", "SECRET_KEY_SIGNED_URL", "CSRF_SECRET","LIMITER_STORAGE_URI", "CACHE_REDIS_URL", "BITRIX_WEBHOOK_URL", 
+        mode='before'
+    )
     @classmethod
     def check_required_vars(cls, error, info: ValidationInfo):
         """
@@ -135,17 +153,22 @@ class ProductionSettings(BaseSettingsClass):
     SESSION_COOKIE_SECURE: bool = True
     REMEMBER_COOKIE_SECURE: bool = True
     CORS_ORIGINS: List[str] = [
-        "https://hr.exp-cr.ru",
-        "https://preza.exp-cr.ru",
-        "https://ecgamingstudio.com",
+        "https://hr.exp-cr.ru", "https://preza.exp-cr.ru", "https://ecgamingstudio.com",
     ]
     FRONTEND_URL: str = "https://hr.exp-cr.ru"
     
-    @field_validator("SECRET_KEY", "DATABASE_URL", "REDIS_URL", "CSRF_SECRET", "SECURITY_PASSWORD_SALT", "JWT_SECRET_KEY", mode='before')
+    @field_validator(
+        "SECRET_KEY", "VAPID_PRIVATE_KEY", "VAPID_PUBLIC_KEY", "JWT_SECRET_KEY", "JWT_ALGORITHM", "DATABASE_URL", "REDIS_URL",
+        "SECURITY_PASSWORD_SALT", "SECRET_KEY_SIGNED_URL", "CSRF_SECRET","LIMITER_STORAGE_URI", "CACHE_REDIS_URL", "BITRIX_WEBHOOK_URL", 
+        mode='before'
+    )
     @classmethod
     def check_required_vars(cls, error, info: ValidationInfo):
         """
-        Проверка обязательных переменных окружения
+        Проверка обязательных переменных окружения\n
+        `error` - Ошибка\n
+        `info` - Информация о поле\n
+        Возвращает ошибку, если переменная окружения отсутствует
         """
         if error is None or error == "":
             raise ValueError(f"Обязательная переменная окружения отсутствует: {info.field_name}")
@@ -153,7 +176,8 @@ class ProductionSettings(BaseSettingsClass):
 
 def get_settings() -> BaseSettingsClass:
     """
-    Получение конфигурации в зависимости от окружения
+    Получение конфигурации в зависимости от окружения\n
+    Возвращает BaseSettingsClass
     """
     env = os.getenv("ENVIRONMENT", "development").lower()
     settings_map = {

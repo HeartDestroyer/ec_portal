@@ -2,7 +2,7 @@
 // Отображается в правой части шапки
 
 import { Dropdown, Avatar } from 'antd';
-import { UserOutlined, LogoutOutlined, FullscreenOutlined, ProfileOutlined, UnlockOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, FullscreenOutlined, ProfileOutlined, UnlockOutlined, BellOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '@/config/app.config';
 
@@ -29,6 +29,15 @@ const UserComponent: React.FC<UserComponentProps> = ({ enterFullscreen, logout }
             icon: <UnlockOutlined />,
             label: <span className="text-sm sm:text-base">Управление сессиями</span>,
             onClick: () => { navigate(APP_CONFIG.ROUTES.PRIVATE.SESSIONS);}
+        },
+        {
+            type: 'divider' as const
+        },
+        {
+            key: 'notifications',
+            icon: <BellOutlined />,
+            label: <span className="text-sm sm:text-base">Управление push-уведомлениями</span>,
+            onClick: () => { navigate(APP_CONFIG.ROUTES.PRIVATE.SETTINGS)}
         },
         {
             type: 'divider' as const

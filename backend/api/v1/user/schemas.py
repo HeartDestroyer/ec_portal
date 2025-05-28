@@ -3,7 +3,7 @@ from typing import Optional, List, Union, Any
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from fastapi import HTTPException, status
 
-from core.models.user import Role, AdditionalRole, Gender, Company, City
+from models.user import Role, AdditionalRole, Gender, Company, City
 from utils.functions import format_phone_number
 from api.v1.dependencies import settings
 

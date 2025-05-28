@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy.dialects.postgresql import UUID
 from typing import Optional
 import uuid
-from core.models.base import Base
+from models.base import Base
 
 class Session(Base):
     __tablename__ = "sessions"

@@ -97,4 +97,6 @@ class MessageResponse(BaseSchema):
     Сообщение и время отправки
     """
     message: str = Field(..., description="Сообщение")
+    status: Optional[bool] = Field(True, description="Статус")
+    data: Optional[Dict] = Field(default=None, description="Дополнительные данные")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Время отправки сообщения")

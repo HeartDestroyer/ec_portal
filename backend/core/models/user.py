@@ -6,11 +6,11 @@ from sqlalchemy import String, Boolean, DateTime, Date, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
-from core.models.base import Base
-from core.models.department import Department
-from core.models.group import Group
-from core.models.session import Session
-from core.models.telegram import ChannelRule
+from models.base import Base
+from models.department import Department
+from models.group import Group
+from models.session import Session
+from models.telegram import ChannelRule
 
 class Role(enum.Enum):
     SUPER_ADMIN = "superadmin"

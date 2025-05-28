@@ -1,39 +1,30 @@
+# backend/api/v1/auth/routes_auth.py - Роуты для аутентификации и авторизации
+
 from fastapi import APIRouter, Depends, Response, Request, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from redis.asyncio import Redis
-from typing import Optional
 
 from api.v1.schemas import MessageResponse, TokenPayload
 from api.v1.dependencies import (
-    JWTHandler, CSRFProtection, EmailManager, SessionManager,
-    get_db, get_redis, settings, logger, jwt_handler, email_manager,
-    require_admin_roles, require_not_guest, require_authenticated,
-    handle_exception,
-    get_refresh_token_from_request, get_access_token_from_request,
-    get_current_user_payload, get_current_active_user
+    CSRFProtection, get_db, settings, require_authenticated, handle_exception,
+    get_refresh_token_from_request, get_current_user_payload, get_current_active_user
 )
-from .schemas import UserCreate, UserLogin, RequestPasswordReset, ResetPassword, UserPublicProfile, UserPrivateProfile, CSRFTokenResponse
-from .services import AuthenticationService
+from api.v1.auth.schemas import (
+    UserCreate, UserLogin, RequestPasswordReset, ResetPassword, UserPrivateProfile, CSRFTokenResponse
+)
+from api.v1.auth.services import (
+    AuthenticationService, RegistrationService, PasswordService, TwoFactorService
+)
+from api.v1.auth.dependencies import (
+    create_authentication_service, create_registration_service, create_password_service, create_two_factor_service
+)
 
 auth_router = APIRouter(prefix="/api/v1/auth", tags=["Аутентификация и авторизация"])
 
-def create_auth_service(
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    jwt_handler: Optional[JWTHandler] = Depends(JWTHandler),
-    email_manager: Optional[EmailManager] = Depends(EmailManager),
-) -> AuthenticationService:
+def delete_auth_cookies(response: Response, access_cookie_name: str, refresh_cookie_name: str) -> None:
     """
-    Создает экземпляр сервиса аутентификации
-    """
-    return AuthenticationService(db, redis, jwt_handler, email_manager)
-
-def delete_auth_cookies(
-    response: Response, 
-    jwt_handler: JWTHandler
-) -> None:
-    """
-    Удаляет куки аутентификации из cookies
+    Удаляет куки аутентификации из cookies\n
+    `access_cookie_name` - Имя куки для access токена\n
+    `refresh_cookie_name` - Имя куки для refresh токена
     """
     cookie_settings = {
         "path": "/api",
@@ -42,8 +33,8 @@ def delete_auth_cookies(
         "samesite": "lax"
     }
 
-    response.delete_cookie(key=jwt_handler.refresh_cookie_name, **cookie_settings)
-    response.delete_cookie(key=jwt_handler.access_cookie_name, **cookie_settings)
+    response.delete_cookie(key=access_cookie_name, **cookie_settings)
+    response.delete_cookie(key=refresh_cookie_name, **cookie_settings)
 
 @auth_router.post(
     "/register", 
@@ -53,26 +44,21 @@ def delete_auth_cookies(
 )
 async def register_user_endpoint(
     user_data: UserCreate,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    jwt_handler: JWTHandler = Depends(JWTHandler),
-    email_manager: EmailManager = Depends(EmailManager),
+    registration_service: RegistrationService = Depends(create_registration_service)
 ) -> MessageResponse:
     """
     Регистрирует нового пользователя в системе\n
     Требует уникальные `login` и `email` и валидирует `password` на сложность\n
     Отправляет письмо для подтверждения и активации аккаунта
     """
-    auth_service = create_auth_service(db, redis, jwt_handler, email_manager)
     try:
-        user = await auth_service.register_service(user_data)
+        user = await registration_service.register_service(user_data)
         return MessageResponse(message=f"Письмо для подтверждения отправлено на почту {user.email}")
     
     except HTTPException as err:
         raise err
     except Exception as err:
-        logger.error(f"Ошибка при регистрации пользователя: {err}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Неожиданная ошибка при регистрации пользователя")
+        raise handle_exception(err, "Неожиданная ошибка при регистрации пользователя")
 
 @auth_router.post(
     "/login", 
@@ -83,10 +69,7 @@ async def login_for_access_token(
     response: Response,
     request: Request,
     credentials: UserLogin,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    jwt_handler: JWTHandler = Depends(JWTHandler),
-    email_manager: EmailManager = Depends(EmailManager),
+    authentication_service: AuthenticationService = Depends(create_authentication_service)
 ) -> MessageResponse:
     """
     Аутентифицирует пользователя по `login`/`email` и password\n
@@ -94,21 +77,16 @@ async def login_for_access_token(
     Реализована защита от брутфорса\n
     Создает сессию для пользователя в таблице Sessions
     """
-    auth_service = create_auth_service(db, redis, jwt_handler, email_manager)
     try:
-        tokens = await auth_service.authenticate_user_service(credentials, request)
-        await jwt_handler.set_token_cookie(response, tokens.refresh_token, jwt_handler.refresh_cookie_name)
-        await jwt_handler.set_token_cookie(response, tokens.access_token, jwt_handler.access_cookie_name)
+        tokens = await authentication_service.authenticate_user_service(credentials, request)
+        await authentication_service.jwt_handler.set_token_cookie(response, tokens.refresh_token, authentication_service.jwt_handler.refresh_cookie_name)
+        await authentication_service.jwt_handler.set_token_cookie(response, tokens.access_token, authentication_service.jwt_handler.access_cookie_name)
         return MessageResponse(message="Добро пожаловать на портал")
     
     except HTTPException as err:
         raise err
     except Exception as err:
-        logger.error(f"Ошибка при входе: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Неожиданная ошибка при входе"
-        )
+        raise handle_exception(err, "Неожиданная ошибка при входе")
 
 @auth_router.post(
     "/refresh", 
@@ -118,9 +96,7 @@ async def login_for_access_token(
 async def refresh_tokens(
     request: Request, 
     response: Response,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis),
-    jwt_handler: JWTHandler = Depends(JWTHandler),
+    authentication_service: AuthenticationService = Depends(create_authentication_service)
 ) -> None:
     """
     Обновление токенов аутентифицированного пользователя\n
@@ -129,22 +105,21 @@ async def refresh_tokens(
     """
     try:
         refresh_token = await get_refresh_token_from_request(request)
-        auth_service = create_auth_service(db, redis, jwt_handler)
         try:
-            await jwt_handler.verify_token(refresh_token, "refresh", redis)
+            await authentication_service.jwt_handler.verify_token(refresh_token, "refresh", authentication_service.redis)
         except HTTPException as err:
-            delete_auth_cookies(response, jwt_handler)
+            delete_auth_cookies(response, authentication_service.jwt_handler)
             raise
         
-        tokens = await auth_service.refresh_tokens_service(refresh_token)
-        await jwt_handler.set_token_cookie(response, tokens.refresh_token, jwt_handler.refresh_cookie_name)
-        await jwt_handler.set_token_cookie(response, tokens.access_token, jwt_handler.access_cookie_name)
+        tokens = await authentication_service.refresh_tokens_service(refresh_token)
+        await authentication_service.jwt_handler.set_token_cookie(response, tokens.refresh_token, authentication_service.jwt_handler.refresh_cookie_name)
+        await authentication_service.jwt_handler.set_token_cookie(response, tokens.access_token, authentication_service.jwt_handler.access_cookie_name)
                 
     except HTTPException:
-        delete_auth_cookies(response, jwt_handler)
+        delete_auth_cookies(response, authentication_service.jwt_handler)
         raise
     except Exception as err:
-        delete_auth_cookies(response, jwt_handler)
+        delete_auth_cookies(response, authentication_service.jwt_handler)
         raise handle_exception(err, "Неожиданная ошибка при обновлении токена")
 
 @auth_router.post(
@@ -156,31 +131,24 @@ async def refresh_tokens(
 async def logout_endpoint(
     request: Request,
     response: Response,
-    redis: Redis = Depends(get_redis),
-    jwt_handler: JWTHandler = Depends(JWTHandler),
+    authentication_service: AuthenticationService = Depends(create_authentication_service),
     token_payload: TokenPayload = Depends(get_current_user_payload),
-    db: AsyncSession = Depends(get_db),
 ) -> MessageResponse:
     """
     Авторизованный API. Доступ: `Авторизованные пользователи`\n
     Выход из системы и отзыв токенов\n
     Удаляет токены из куки и завершает сессию
     """
-    auth_service = create_auth_service(db, redis, jwt_handler)
     try:
         refresh_token = await get_refresh_token_from_request(request)
-        await auth_service.logout_service(token_payload.user_id, token_payload.session_id, refresh_token)
-        delete_auth_cookies(response, jwt_handler)
+        await authentication_service.logout_service(token_payload.user_id, token_payload.session_id, refresh_token)
+        delete_auth_cookies(response, authentication_service.jwt_handler)
         return MessageResponse(message="Вы успешно вышли из системы")
     
     except HTTPException as err:
         raise err
     except Exception as err:
-        logger.error(f"Ошибка при выходе из системы: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Неожиданная ошибка при выходе из системы"
-        )
+        raise handle_exception(err, "Неожиданная ошибка при выходе из системы")
 
 @auth_router.get(
     "/me", 
@@ -204,11 +172,7 @@ async def read_users_me(
     except HTTPException:
         raise
     except Exception as err:
-        logger.error(f"Ошибка при получении данных пользователя: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Неожиданная ошибка при получении данных пользователя"
-        )
+        raise handle_exception(err, "Неожиданная ошибка при получении данных пользователя")
 
 @auth_router.post(
     "/request-password-reset",
@@ -218,14 +182,13 @@ async def read_users_me(
 )
 async def request_password_reset_endpoint(
     data: RequestPasswordReset,
-    db: AsyncSession = Depends(get_db),
+    password_service: PasswordService = Depends(create_password_service),
 ) -> MessageResponse:
     """
     Отправляет ссылку для сброса пароля на указанную почту, если пользователь существует\n
     Всегда возвращает успешный ответ, чтобы не раскрывать существование почты
     """
-    auth_service = create_auth_service(db, None)
-    return await auth_service.request_password_reset_service(data.email)
+    return await password_service.request_password_reset_service(data.email)
 
 @auth_router.post(
     "/reset-password",
@@ -234,15 +197,13 @@ async def request_password_reset_endpoint(
 )
 async def reset_password_endpoint(
     data: ResetPassword,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis)
+    password_service: PasswordService = Depends(create_password_service),
 ) -> MessageResponse:
     """
     Устанавливает новый пароль, используя токен из письма\n
     Валидирует новый пароль и отзывает все активные сессии пользователя
     """
-    auth_service = create_auth_service(db, redis)
-    return await auth_service.reset_password_service(data)
+    return await password_service.reset_password_service(data)
     
 @auth_router.get(
     "/verify-email",
@@ -251,14 +212,13 @@ async def reset_password_endpoint(
 )
 async def verify_email_endpoint(
     token: str = Query(..., description="Токен подтверждения почты"),
-    db: AsyncSession = Depends(get_db),
+    registration_service: RegistrationService = Depends(create_registration_service),
 ) -> MessageResponse:
     """
     Подтверждает почту пользователя по токену из письма\n
     Активирует аккаунт пользователя
     """
-    auth_service = create_auth_service(db, None)
-    return await auth_service.verify_email_service(token)
+    return await registration_service.verify_email_service(token)
 
 @auth_router.get(
     "/csrf",
@@ -280,13 +240,8 @@ async def get_csrf_token(
         csrf_token = csrf_protection.generate_csrf_token()
         await csrf_protection.set_csrf_token_cookie(response, csrf_token)
         return CSRFTokenResponse(csrf_token=csrf_token)
-        
     except Exception as err:
-        logger.error(f"Ошибка при получении CSRF токена: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при получении CSRF токена"
-        )
+        raise handle_exception(err, "Ошибка при получении CSRF токена")
 
 @auth_router.post(
     "/2fa",
@@ -296,22 +251,16 @@ async def get_csrf_token(
 @require_authenticated()
 async def enable_2fa_endpoint(
     request: Request,
-    db: AsyncSession = Depends(get_db),
+    two_factor_service: TwoFactorService = Depends(create_two_factor_service),
 ) -> MessageResponse:
     """
     Авторизованный API. Доступ: `Авторизованные пользователи`\n
     Включает двухфакторную аутентификацию для текущего пользователя
     """
     try:      
-        auth_service = create_auth_service(db, None)
-        return await auth_service.enable_2fa_service()
+        return await two_factor_service.enable_2fa_service()
     
     except HTTPException as err:
         raise err
     except Exception as err:
-        logger.error(f"Ошибка при включении двухфакторной аутентификации: {err}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Неожиданная ошибка при включении двухфакторной аутентификации"
-        )
-
+        raise handle_exception(err, "Неожиданная ошибка при включении двухфакторной аутентификации")

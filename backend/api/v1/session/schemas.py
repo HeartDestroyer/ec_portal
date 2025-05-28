@@ -42,7 +42,7 @@ class SessionFilter(BaseModel):
     user_name: Optional[str] = Field(None, description="Имя пользователя")
     is_active: Optional[bool] = Field(None, description="Активная ли сессия")
     page: int = Field(default=1, ge=1, description="Номер страницы")
-    page_size: int = Field(default=20, ge=1, le=100, description="Размер страницы")
+    page_size: int = Field(default=10, ge=1, le=100, description="Размер страницы")
 
 class SessionsPage(BaseModel):
     """

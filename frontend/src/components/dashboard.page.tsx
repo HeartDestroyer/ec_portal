@@ -6,15 +6,11 @@ import { APP_CONFIG } from '@/config/app.config';
 
 const Dashboard: React.FC = () => {
     const { user } = useAuth();
-
+    
     return (
         <div className="pb-4">
-            <h1 className="text-2xl font-bold">
-                Добро пожаловать, {user?.name} на {APP_CONFIG.NAME}
-            </h1>
-            <p className="text-base">
-                Ваш персональный портал для работы и обучения
-            </p>
+            <h1>Добро пожаловать, {user?.name}</h1>
+            <p className='text-base'>Ваш персональный {APP_CONFIG.NAME} для работы и обучения</p>
         </div>
     );
 };
