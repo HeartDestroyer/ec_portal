@@ -13,6 +13,14 @@ class BaseService(ABC):
     `db` - Сессия базы данных\n
     `redis` - Redis клиент (опционально)\n
     `logger` - Логгер для текущего класса
+
+    Методы:
+        - `commit_transaction()` - Подтверждение транзакции
+        - `rollback_transaction()` - Откат транзакции
+        - `log_info()` - Логирование информации
+        - `log_error()` - Логирование ошибок
+        - `log_warning()` - Логирование предупреждений
+        - `log_debug()` - Логирование отладочной информации
     """
     
     def __init__(self, db: AsyncSession, redis: Optional[Redis] = None):

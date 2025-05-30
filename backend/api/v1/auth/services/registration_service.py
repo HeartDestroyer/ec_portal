@@ -1,5 +1,7 @@
 # backend/api/v1/auth/services/registration_service.py - Сервис для регистрации пользователя
 
+# TODO: Запилить возможность выбора пользователя своей группы, если он сотрудник компании, понять как это сделать
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis.asyncio import Redis
@@ -9,7 +11,7 @@ from core.services.base_service import BaseService
 from core.interfaces.auth.auth_services import RegistrationServiceInterface
 from core.interfaces.auth.auth_repositories import UserRepositoryInterface
 from core.models.user import User
-from core.security.password import password_manager
+from backend.core.security.password_service import password_manager
 from api.v1.schemas import MessageResponse
 from api.v1.auth.schemas.request_schemas import UserCreate
 from api.v1.dependencies import EmailManager, JWTHandler

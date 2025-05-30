@@ -11,7 +11,7 @@ from typing import Optional
 from core.services.base_service import BaseService
 from core.interfaces.auth.auth_services import PasswordServiceInterface
 from core.interfaces.auth.auth_repositories import UserRepositoryInterface
-from core.security.password import password_manager
+from backend.core.security.password_service import password_manager
 from api.v1.schemas import MessageResponse
 from api.v1.auth.schemas import ResetPassword
 from api.v1.dependencies import EmailManager, JWTHandler, SessionManager

@@ -13,7 +13,7 @@ from api.v1.schemas import TokenPayload, Tokens
 from api.v1.auth.schemas import UserLogin
 from api.v1.dependencies import JWTHandler, SessionManager, EmailManager, settings
 from api.v1.session.utils import SessionUtils
-from core.security.password import password_manager
+from backend.core.security.password_service import password_manager
 from core.models.user import User
 
 class AuthenticationService(BaseService, AuthenticationServiceInterface):
@@ -57,7 +57,6 @@ class AuthenticationService(BaseService, AuthenticationServiceInterface):
         """
         Аутентификация пользователя\n
         `credentials` - Учетные данные пользователя в виде UserLogin\n
-        `request` - Объект запроса FastAPI\n
         Возвращает токены в виде Tokens
         """
         try:

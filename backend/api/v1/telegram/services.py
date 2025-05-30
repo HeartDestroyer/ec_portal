@@ -14,7 +14,7 @@ from models.user import User
 from models.department import Department
 from models.group import Group
 from core.extensions.logger import logger
-from core.security.jwt import JWTHandler
+from backend.core.security.jwt_service import JWTHandler
 
 # Сервис для работы с ТГ группами
 class TelegramService:

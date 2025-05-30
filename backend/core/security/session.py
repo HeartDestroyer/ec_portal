@@ -9,7 +9,7 @@ from fastapi_cache.decorator import cache
 from fastapi_cache.coder import JsonCoder
 import json
 
-from core.security.jwt import JWTHandler
+from backend.core.security.jwt_service import JWTHandler
 from models.user import User
 from models.session import Session
 from core.extensions.logger import logger

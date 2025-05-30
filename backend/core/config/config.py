@@ -45,6 +45,8 @@ class BaseSettingsClass(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = Field(True, env="CORS_ALLOW_CREDENTIALS", description="Разрешение использования credentials в CORS")
     CORS_ALLOW_METHODS: List[str] = Field(["*"], env="CORS_ALLOW_METHODS", description="Методы, разрешенные в CORS")
     CORS_ALLOW_HEADERS: List[str] = Field(["*"], env="CORS_ALLOW_HEADERS", description="Заголовки, разрешенные в CORS")
+    CSRF_CHECK_ORIGIN: bool = Field(True, env="CSRF_CHECK_ORIGIN", description="Проверка Origin для CSRF")
+    CSRF_TOKEN_BYTES_LENGTH: int = Field(32, env="CSRF_TOKEN_BYTES_LENGTH", description="Длина CSRF токена")
 
     # Настройки базы данных
     DATABASE_URL: str = Field(..., env="DATABASE_URL", description="URL базы данных")
@@ -82,6 +84,7 @@ class BaseSettingsClass(BaseSettings):
     MIN_LENGTH: int = Field(8, env="MIN_LENGTH", description="Минимальная длина пароля")
     MAX_FAILED_ATTEMPTS: int = Field(5, env="MAX_FAILED_ATTEMPTS", description="Максимальное количество неудачных попыток входа")
     LOCKOUT_DURATION: int = Field(15, env="LOCKOUT_DURATION", description="Время блокировки в секундах")
+    SESSION_COOKIE_SECURE: bool = Field(True, env="SESSION_COOKIE_SECURE", description="Использование cookie с флагом secure")
 
     # Настройки ограничителя запросов
     LIMITER_STORAGE_URI: str = Field(..., env="LIMITER_STORAGE_URI")
@@ -150,7 +153,6 @@ class ProductionSettings(BaseSettingsClass):
     Конфигурация для продакшена
     """
     DEBUG: bool = False
-    SESSION_COOKIE_SECURE: bool = True
     REMEMBER_COOKIE_SECURE: bool = True
     CORS_ORIGINS: List[str] = [
         "https://hr.exp-cr.ru", "https://preza.exp-cr.ru", "https://ecgamingstudio.com",

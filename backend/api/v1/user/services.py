@@ -17,7 +17,7 @@ from .schemas import (
 )
 from api.v1.schemas import MessageResponse, TokenPayload
 from core.extensions.logger import logger
-from core.security.jwt import JWTHandler
+from backend.core.security.jwt_service import JWTHandler
 
 # Сервис для работы с данными пользователя и пользователем
 class UserService:

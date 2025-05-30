@@ -5,7 +5,7 @@ from typing import Optional
 from pydantic.types import UUID4
 import uuid
 
-from core.security.password import password_manager
+from backend.core.security.password_service import password_manager
 
 BASE_CONFIG = ConfigDict(
     from_attributes=True,

@@ -10,21 +10,23 @@
     - require_authenticated - для доступа авторизованному пользователю
 """
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Depends
 from functools import wraps
 from typing import List, Optional, Callable, Any, Dict, TypeVar
 import traceback
 import inspect
 
-from core.extensions.logger import logger
+from repositories.user_repository import UserRepository
+from core.models.user import User
 from core.extensions.database import get_db
+from core.extensions.logger import logger
 from core.extensions.redis import get_redis
 from core.config.config import BaseSettingsClass, get_settings, settings
-from core.security.jwt import (
+from core.security.jwt_service import (
     get_current_user_payload, get_current_active_user, jwt_handler, JWTHandler
 )
-from core.security.csrf import csrf_verify_header, CSRFProtection
-from core.security.email import email_manager, EmailManager
+from core.security.csrf_service import csrf_verify_header, CSRFProtection
+from core.security.email_service import email_manager, EmailManager
 from core.security.session import SessionManager
 from .schemas import TokenPayload
 
@@ -153,6 +155,19 @@ async def check_role(request: Request, allowed_roles: List[str]) -> TokenPayload
     if payload.role not in allowed_roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для выполнения операции")
     return payload
+
+async def get_current_active_user(
+    payload: TokenPayload = Depends(get_current_user_payload),
+    user_repo: UserRepository = Depends(get_user_repository)
+) -> User:
+    """
+    Получает текущего активного пользователя\n
+    `payload` - Токен пользователя\n
+    `user_repo` - Репозиторий пользователей\n
+    Возвращает пользователя
+    """
+    return await user_repo.get_active_user_by_id(payload.user_id)
+
 
 
 def require_admin_roles(allowed_roles: Optional[List[str]] = None):
