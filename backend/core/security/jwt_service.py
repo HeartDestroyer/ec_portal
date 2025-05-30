@@ -16,7 +16,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 class JWTService:
     """
-    Класс для работы с JWT токенами по принципам SOLID, DRY, KISS\n
+    Класс для работы с JWT токенами по принципам SOLID, DRY, KISS
+    
     Методы для работы с JWT токенами:
         - `create_token` - Создает JWT токен и сохраняет в Redis
         - `create_tokens` - Создает пару access и refresh токенов

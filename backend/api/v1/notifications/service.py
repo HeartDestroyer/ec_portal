@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from fastapi_cache.decorator import cache
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, stop_after_attempt, wait_exponential, RetryError
-from core.security.session import JsonCoder
+from backend.api.v1.session.services.session_service import JsonCoder
 from fastapi_cache import FastAPICache
 import asyncio
 

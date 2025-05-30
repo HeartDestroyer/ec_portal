@@ -10,9 +10,7 @@ ModelType = TypeVar("ModelType", bound=DeclarativeBase)
 
 class BaseRepository(ABC, Generic[ModelType]):
     """
-    Базовый репозиторий для CRUD операций\n
-    `session` - Сессия базы данных\n
-    `model` - Модель базы данных
+    Базовый репозиторий для CRUD операций
 
     Методы:
         - `get_by_id` - Получить объект по ID

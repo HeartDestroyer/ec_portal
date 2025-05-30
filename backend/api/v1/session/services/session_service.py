@@ -1,4 +1,5 @@
-from datetime import datetime
+# backend/api/v1/session/services/session_service.py - Сервис для работы с сессиями
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
@@ -6,67 +7,40 @@ from redis.asyncio import Redis
 from typing import Optional, List, Any
 from fastapi_cache import FastAPICache
 from fastapi_cache.decorator import cache
-from fastapi_cache.coder import JsonCoder
-import json
 
-from backend.core.security.jwt_service import JWTHandler
-from models.user import User
-from models.session import Session
+from utils.custom_json_coder import CustomJsonCoder
+from backend.core.interfaces.session.session_services import SessionServiceInterface
+from core.services.base_service import BaseService
+from repositories.session_repository import SessionRepository
+from core.models.user import User
+from core.models.session import Session
 from core.extensions.logger import logger
 from core.config.config import settings
 from api.v1.session.schemas import SessionFilter, SessionsPage, SessionResponse, UserAgentInfo
-from api.v1.session.utils import SessionUtils
+from api.v1.session.utils import session_utils
 
-
-class CustomJsonCoder(JsonCoder):
+class SessionService(BaseService, SessionServiceInterface):
     """
-    JsonCoder, который:
-      - При записи в Redis отдаёт plain JSON-строку (str), так что с decode_responses=True всё ровно сохраняется/читается как str
-      - При загрузке принимает и bytes, и str и всегда возвращает Python-объект
-    """    
-    def dump(self, value: any) -> any:
-        return json.dumps(value, default=self.default)
-
-    def load(self, value: any) -> any:
-        text = value.decode("utf-8") if isinstance(value, (bytes, bytearray)) else value
-        return json.loads(text)
-
-
-class SessionManager:
-    """
-    Класс для управления сессиями пользователей использует паттерн Singleton и Redis для кэширования\n
+    Класс для управления сессиями пользователей
+    
     Методы:
-        - `get_session_by_id` - Получение сессии по ID\n
-        - `get_sessions_user` - Получение всех сессий пользователя\n
-        - `get_active_sessions_user` - Получение активных сессий пользователя\n
-        - `update_session_last_activity` - Обновление времени последней активности сессии\n
-        - `create_session` - Создание новой сессии\n
-        - `get_sessions_filtered` - Получение списка сессий с фильтром и кэшированием\n
-        - `deactivate_session` - Деактивация сессии\n
-        - `terminate_other_sessions` - Завершение всех сессий пользователя, кроме текущей\n
-        - `deactivate_all_sessions` - Деактивация всех сессий пользователя
+        - `get_session_by_id` - Получает сессию по ID
+        - `get_sessions_user` - Получает все сессии пользователя
+        - `get_active_sessions_user` - Получает активные сессии пользователя
+        - `create_session` - Создает новую сессию для пользователя
+        - `get_sessions_filtered` - Получает список сессий с фильтром и кэшированием
+        - `deactivate_session` - Деактивирует сессию
+        - `terminate_other_sessions` - Завершает все сессии пользователя, кроме текущей
+        - `deactivate_all_sessions` - Деактивирует все сессии пользователя
     """
 
-    _instance = None
-    _init_lock = False
-
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super(SessionManager, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-
-    def __init__(self, db: AsyncSession, jwt_handler: Optional[JWTHandler] = None, redis: Optional[Redis] = None):
-        if not self._initialized and not SessionManager._init_lock:
-            SessionManager._init_lock = True
-            self.db = db
-            self.jwt_handler = jwt_handler
-            self.redis = redis
-            self.admin_roles = settings.ADMIN_ROLES
-            self.session_utils = SessionUtils()
-            self.max_sessions = settings.MAX_ACTIVE_SESSIONS_PER_USER
-            self._initialized = True
-            SessionManager._init_lock = False
+    def __init__(self, db: AsyncSession, session_repository: SessionRepository, redis: Optional[Redis] = None):
+        self.db = db
+        self.session_repository = session_repository
+        self.redis = redis
+        self.admin_roles = settings.ADMIN_ROLES
+        self.session_utils = session_utils
+        self.max_sessions = settings.MAX_ACTIVE_SESSIONS_PER_USER
 
     @cache(expire=3600, coder=CustomJsonCoder, namespace="sessions:one")
     async def get_session_by_id(self, session_id: str) -> Optional[Session]:
@@ -76,10 +50,7 @@ class SessionManager:
         Возвращает сессию, иначе возвращает None
         """
         try:
-            query = select(Session).where(Session.id == session_id)
-            result = await self.db.execute(query)
-            return result.scalar_one_or_none()
-        
+            return await self.session_repository.get_session_by_id(session_id)
         except Exception as err:
             logger.error(f"Ошибка при получении сессии по ID {session_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при получении сессии по ID")
@@ -92,11 +63,7 @@ class SessionManager:
         Возвращает список сессий, иначе возвращает пустой список
         """
         try:
-            query = select(Session).where(Session.user_id == user_id).order_by(Session.last_activity.desc())
-            result = await self.db.execute(query)
-            sessions = result.scalars().all()
-            return list(sessions) if sessions else []
-        
+            return await self.session_repository.get_sessions_by_user(user_id)
         except Exception as err:
             logger.error(f"Ошибка при получении сессий пользователя {user_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при получении сессий пользователя")
@@ -109,41 +76,57 @@ class SessionManager:
         Возвращает список активных сессий, иначе возвращает пустой список
         """
         try:
-            query = select(Session).where(
-                and_(
-                    Session.user_id == user_id,
-                    Session.is_active == True
-                )
-            ).order_by(Session.last_activity.desc())
-            
-            result = await self.db.execute(query)
-            sessions = result.scalars().all()
-            return list(sessions) if sessions else []
-        
+            return await self.session_repository.get_active_sessions_by_user(user_id)
         except Exception as err:
             logger.error(f"Ошибка при получении активных сессий пользователя {user_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при получении активных сессий пользователя")
 
-    async def update_session_last_activity(self, session_id: str) -> None:
+
+    async def create_session(self, user: User, user_agent_info: UserAgentInfo) -> Session:
         """
-        Обновляет время последней активности сессии\n
-        `session_id` - ID сессии\n
-        В случае ошибки возвращает HTTPException
+        Создает новую сессию для пользователя\n
+        `user` - Пользователь\n
+        `user_agent_info` - Информация о браузере пользователя в виде UserAgentInfo\n
+        Деактивирует старые сессии, если их количество превышает лимит активных сессий\n
+        Возвращает новую сессию, в случае ошибки возвращает HTTPException
         """
         try:
-            session = await self.get_session_by_id(session_id)
-            if not session:
-                return
-
-            session.last_activity = datetime.utcnow()
-            await self.db.commit()
+            # Получаем активные сессии
+            active_sessions = await self.session_repository.get_active_sessions_by_user(str(user.id))
             
-            # Инвалидируем кэш
-            await FastAPICache.clear(f"sessions")
+            # Если у пользователя слишком много активных сессий, деактивируем самые старые
+            if len(active_sessions) >= self.max_sessions:
+                logger.warning(f"Превышен лимит активных сессий ({self.max_sessions}) для пользователя {user.name}")
+                sessions_to_deactivate = active_sessions[:(len(active_sessions) - self.max_sessions + 1)]
+                for session in sessions_to_deactivate:
+                    await self.deactivate_session(str(session.id), str(user.id), user.role.value)
+                    await self.jwt_handler.revoke_tokens(str(user.id), self.redis, str(session.id))
+                
+            # Создаем новую сессию
+            new_session = Session(
+                user_id=user.id,
+                device=user_agent_info.device or "Нет данных",
+                browser=user_agent_info.browser or "Нет данных",
+                ip_address=user_agent_info.ip_address or "Нет данных",
+                os=user_agent_info.os or "Нет данных",
+                platform=user_agent_info.platform or "Нет данных",
+                location=user_agent_info.location or "Нет данных",
+                is_active=True
+            )
 
+            self.db.add(new_session)
+            await self.db.commit()
+            await self.db.refresh(new_session)
+
+            await FastAPICache.clear(f"sessions")
+            
+            logger.info(f"Создана новая сессия {new_session.id} для пользователя {user.id}")
+            return new_session
+        
         except Exception as err:
-            logger.error(f"Ошибка при обновлении времени последней активности сессии {session_id}: {err}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при обновлении времени последней активности сессии")
+            await self.db.rollback()
+            logger.error(f"Ошибка при создании сессии для пользователя {str(user.id)}: {err}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при создании сессии")
 
 
     def build_session_query(self, filter: SessionFilter) -> Any:
@@ -168,62 +151,6 @@ class SessionManager:
         query = query.order_by(Session.last_activity.desc())
 
         return query
-
-    async def create_session(self, user: User, user_agent_info: UserAgentInfo) -> Session:
-        """
-        Создает новую сессию для пользователя\n
-        `user` - Пользователь\n
-        `user_agent_info` - Информация о браузере пользователя в виде UserAgentInfo\n
-        Деактивирует старые сессии, если их количество превышает лимит активных сессий\n
-        Возвращает новую сессию, в случае ошибки возвращает HTTPException
-        """
-        try:
-            # Получаем активные сессии
-            active_sessions = await self.get_active_sessions_user(str(user.id))
-            
-            # Если у пользователя слишком много активных сессий, деактивируем самые старые
-            if len(active_sessions) >= self.max_sessions:
-                logger.warning(
-                    f"Превышен лимит активных сессий ({self.max_sessions}) для пользователя {user.name}. Деактивация старых сессий"
-                )
-                
-                # Сортируем сессии по времени последней активности
-                active_sessions.sort(key=lambda s: s.last_activity)
-                
-                # Деактивируем старые сессии
-                sessions_to_deactivate = active_sessions[:(len(active_sessions) - self.max_sessions + 1)]
-                for session in sessions_to_deactivate:
-                    await self.deactivate_session(str(session.id), str(user.id), user.role.value)
-                    await self.jwt_handler.revoke_tokens(str(user.id), self.redis, str(session.id))
-                
-                await self.db.commit()
-
-            # Создаем новую сессию
-            new_session = Session(
-                user_id=user.id,
-                device=user_agent_info.device or "Нет данных",
-                browser=user_agent_info.browser or "Нет данных",
-                ip_address=user_agent_info.ip_address or "Нет данных",
-                os=user_agent_info.os or "Нет данных",
-                platform=user_agent_info.platform or "Нет данных",
-                location=user_agent_info.location or "Нет данных",
-                is_active=True
-            )
-
-            self.db.add(new_session)
-            await self.db.commit()
-            await self.db.refresh(new_session)
-
-            # Инвалидируем кэш
-            await FastAPICache.clear(f"sessions")
-            
-            logger.info(f"Создана новая сессия {new_session.id} для пользователя {user.id}")
-            return new_session
-        
-        except Exception as err:
-            await self.db.rollback()
-            logger.error(f"Ошибка при создании сессии для пользователя {str(user.id)}: {err}")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при создании сессии")
 
     @cache(expire=3600, coder=CustomJsonCoder, namespace="sessions:filtered")
     async def get_sessions_filtered(self, filter: SessionFilter, current_session_id: str) -> SessionsPage:
@@ -297,6 +224,7 @@ class SessionManager:
                 detail="Ошибка при получении списка сессий"
             )
 
+
     async def deactivate_session(self, session_id: str, user_id: str, user_role: str) -> None:
         """
         Деактивирует сессию\n
@@ -312,26 +240,17 @@ class SessionManager:
 
             # Проверка прав доступа
             if str(session.user_id) != user_id and user_role not in self.admin_roles:
-                logger.warning(f"Пользователь {user_id} попытался деактивировать сессию {session_id} пользователя {session.user_id}")
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Нет прав для деактивации этой сессии")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для деактивации этой сессии")
 
-            session.is_active = False
-            session.last_activity = datetime.utcnow()
-            await self.db.commit()
-
-            # Инвалидируем кэш
+            await self.session_repository.deactivate_session(session_id)
             await FastAPICache.clear(f"sessions")
-            
-            # Отзываем токены только для конкретной сессии
-            await self.jwt_handler.revoke_tokens(str(session.user_id), self.redis, str(session.id))
-            
-            logger.info(f"Сессия {session_id} деактивирована пользователем {user_id} с ролью {user_role}")
+            logger.info(f"[deactivate_session] Сессия {session_id} деактивирована пользователем {user_id} с ролью {user_role}")
 
         except HTTPException:
             raise
         except Exception as err:
             await self.db.rollback()
-            logger.error(f"Ошибка при деактивации сессии {session_id}: {err}")
+            logger.error(f"[deactivate_session] Ошибка при деактивации сессии {session_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при деактивации сессии")
 
     async def terminate_other_sessions(self, current_session_id: str, user_id: str) -> None:
@@ -342,39 +261,20 @@ class SessionManager:
         В случае ошибки возвращает HTTPException
         """
         try:
-            query = select(Session).where(
-                and_(
-                    Session.user_id == user_id,
-                    Session.id != current_session_id,
-                    Session.is_active == True
-                )
-            )
-            result = await self.db.execute(query)
-            sessions = result.scalars().all()
-
-            if not sessions:
+            session = await self.get_session_by_id(current_session_id)
+            if not session:
                 return
 
-            terminated_count = 0
-            for session in sessions:
-                session.is_active = False
-                session.last_activity = datetime.utcnow()
-                terminated_count += 1
-
-            await self.db.commit()
+            if str(session.user_id) != user_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="У вас нет прав для завершения других сессий")
             
-            # Инвалидируем кэш
+            await self.session_repository.terminate_other_sessions(user_id, current_session_id)
             await FastAPICache.clear(f"sessions")
-
-            # Отзыв токенов в Redis для всех сессий, кроме текущей
-            for session in sessions:
-                await self.jwt_handler.revoke_tokens(user_id, self.redis, str(session.id))
-            
-            logger.info(f"Завершено {terminated_count} других сессий пользователя {user_id}")
+            logger.info(f"[terminate_other_sessions] Все сессии пользователя {user_id}, кроме текущей, завершены")
 
         except Exception as err:
             await self.db.rollback()
-            logger.error(f"Ошибка при завершении других сессий пользователя {user_id}: {err}")
+            logger.error(f"[terminate_other_sessions] Ошибка при завершении других сессий пользователя {user_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при завершении других сессий")
 
     async def deactivate_all_sessions(self, user_id: str) -> None:
@@ -384,27 +284,11 @@ class SessionManager:
         В случае ошибки возвращает HTTPException
         """
         try:
-            sessions = await self.get_active_sessions_user(user_id)
-            if not sessions:
-                return
-
-            deactivated_count = 0
-            for session in sessions:
-                session.is_active = False
-                session.last_activity = datetime.utcnow()
-                deactivated_count += 1
-
-            await self.db.commit()
-            
-            # Инвалидируем кэш
+            await self.session_repository.deactivate_all_sessions(user_id)
             await FastAPICache.clear(f"sessions")
-            
-            # Отзываем все токены пользователя
-            await self.jwt_handler.revoke_tokens(user_id, self.redis)
-            
-            logger.info(f"Деактивировано {deactivated_count} сессий пользователя {user_id}")
+            logger.info(f"[deactivate_all_sessions] Все сессии пользователя {user_id} деактивированы")
 
         except Exception as err:
             await self.db.rollback()
-            logger.error(f"Ошибка при деактивации всех сессий пользователя {user_id}: {err}")
+            logger.error(f"[deactivate_all_sessions] Ошибка при деактивации всех сессий пользователя {user_id}: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при деактивации всех сессий")

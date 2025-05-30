@@ -90,7 +90,6 @@ class Tokens(BaseSchema):
     access_token: str = Field(..., description="Access токен для аутентификации")
     refresh_token: str = Field(..., description="Refresh токен для аутентификации")
 
-# Стандартная схема для ответа на запросы
 class MessageResponse(BaseSchema):
     """
     Стандартная схема для ответа на запросы\n

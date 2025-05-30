@@ -9,15 +9,13 @@ from core.models.user import User
 
 class UserRepository(BaseRepository[User]):
     """
-    Репозиторий для работы с пользователями\n
-    `session` - Сессия базы данных\n
-    `model` - Модель базы данных
+    Репозиторий для работы с пользователями
 
     Методы:
-        - `get_by_id()` - Находит пользователя по ID
-        - `get_by_login_or_email()` - Находит пользователя по login или email
-        - `create_user()` - Создает нового пользователя
-        - `update_user()` - Обновляет данные пользователя
+        - `get_by_id` - Находит пользователя по ID
+        - `get_by_login_or_email` - Находит пользователя по login или email
+        - `create_user` - Создает нового пользователя
+        - `update_user` - Обновляет данные пользователя
     """
     
     def __init__(self, session: AsyncSession):
@@ -65,5 +63,3 @@ class UserRepository(BaseRepository[User]):
         await self.session.commit()
         await self.session.refresh(user)
         return user
-
-    

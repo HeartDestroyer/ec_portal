@@ -21,6 +21,10 @@ class CSRFProtection:
         - `verify_origin` - Проверяет Origin
         - `get_token_from_request` - Извлекает CSRF токен из заголовка или cookie запроса
         - `set_csrf_token_cookie` - Устанавливает CSRF токен в cookie
+
+    Зависимости:
+        - `csrf_protect` - Декоратор для защиты от CSRF атак
+        - `get_csrf_token` - Генерирует новый CSRF токен
     """
 
     def __init__(self):
@@ -53,6 +57,7 @@ class CSRFProtection:
         Возвращает подпись для сообщения в виде hex строки
         """
         return hmac.new(self.secret, message, hashlib.sha256).hexdigest()
+
 
     async def generate_csrf_token(self) -> str:
         """

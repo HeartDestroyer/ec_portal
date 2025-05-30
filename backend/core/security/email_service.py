@@ -17,7 +17,8 @@ from backend.core.security.jwt_service import jwt_handler
 
 class EmailManager:
     """
-    Менеджер для отправки email с использованием шаблонов (Single Responsibility, YAGNI принципы)
+    Менеджер для отправки email с использованием шаблонов
+    
     Методы:
         - `send_verification_email` - Отправка email для подтверждения со сроком действия\n
         - `send_password_reset_email` - Отправка email для сброса пароля со сроком действия\n

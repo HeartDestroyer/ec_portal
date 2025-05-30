@@ -1,24 +1,14 @@
+# backend/api/v1/session/session_routes.py - Маршруты для управления сессиями пользователей
+
 from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from redis.asyncio import Redis
 
-from core.extensions.logger import logger
-from .schemas import SessionFilter, SessionsPage, SessionResponse
-from core.security.session import SessionManager
-from api.v1.dependencies import get_db, settings, jwt_handler, require_authenticated, get_current_user_payload, get_redis, JWTHandler
-from api.v1.schemas import TokenPayload, MessageResponse
+from api.v1.dependencies import settings, require_authenticated, handle_exception, get_current_user_payload, MessageResponse, TokenPayload
+from api.v1.session.schemas import SessionFilter, SessionsPage, SessionResponse, UserAgentInfo
+from api.v1.session.services import SessionService
+from api.v1.session.dependencies import get_session_repository, create_session_service
 
 session_router = APIRouter(prefix="/api/v1/session", tags=["Управление сессиями пользователей"])
-
-def create_session_service(
-    db: AsyncSession = Depends(get_db),
-    jwt_handler: JWTHandler = Depends(JWTHandler),
-    redis: Redis = Depends(get_redis)
-) -> SessionManager:
-    """
-    Создает экземпляр сервиса сессий
-    """
-    return SessionManager(db, jwt_handler, redis)
 
 @session_router.get(
     "",
@@ -30,7 +20,7 @@ async def get_sessions(
     request: Request,
     current_user: TokenPayload = Depends(get_current_user_payload),
     filter: SessionFilter = Depends(),
-    session_service: SessionManager = Depends(create_session_service),
+    session_service: SessionService = Depends(create_session_service),
 ) -> SessionsPage:
     """
     Авторизованный API. Доступ: `Администраторы`, `Руководители`, `Сотрудники`, `Гости`\n
@@ -48,8 +38,7 @@ async def get_sessions(
         return await session_service.get_sessions_filtered(filter, current_user.session_id)
     
     except Exception as err:
-        logger.error(f"Ошибка при получении списка сессий: {err}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при получении списка сессий")
+        handle_exception(err, "Ошибка при получении списка сессий", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @session_router.delete(
     "",
@@ -60,7 +49,7 @@ async def get_sessions(
 async def terminate_other_sessions(
     request: Request,
     current_user: TokenPayload = Depends(get_current_user_payload),
-    session_service: SessionManager = Depends(create_session_service),
+    session_service: SessionService = Depends(create_session_service),
 ) -> MessageResponse:
     """
     Авторизованный API. Доступ: `Администраторы`, `Руководители`, `Сотрудники`, `Гости`\n
@@ -71,8 +60,7 @@ async def terminate_other_sessions(
         return MessageResponse(message="Все остальные сессии успешно завершены")
     
     except Exception as err:
-        logger.error(f"Ошибка при завершении не текущих сессий пользователя {current_user.user_id}: {err}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при завершении других сессий")
+        handle_exception(err, "Ошибка при завершении не текущих сессий", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @session_router.delete(
     "/{session_id}",
@@ -84,7 +72,7 @@ async def deactivate_session(
     request: Request,
     session_id: str,
     current_user: TokenPayload = Depends(get_current_user_payload),
-    session_service: SessionManager = Depends(create_session_service),
+    session_service: SessionService = Depends(create_session_service),
 ) -> MessageResponse:
     """ 
     Авторизованный API. Доступ: `Администраторы`, `Создатель сессии`\n 
@@ -95,5 +83,4 @@ async def deactivate_session(
         return MessageResponse(message="Сессия успешно завершена")
     
     except Exception as err:
-        logger.error(f"Ошибка при завершении сессии {session_id} пользователя {current_user.user_id} с ролью {current_user.role}: {err}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при завершении сессии")
+        handle_exception(err, "Ошибка при завершении сессии", status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -109,5 +109,3 @@ class RegistrationService(BaseService, RegistrationServiceInterface):
         except Exception as err:
             self.log_error(f"Ошибка при подтверждении email: {err}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Ошибка при подтверждении email")
-
-

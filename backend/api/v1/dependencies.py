@@ -10,25 +10,23 @@
     - require_authenticated - для доступа авторизованному пользователю
 """
 
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import Request, HTTPException, status
 from functools import wraps
 from typing import List, Optional, Callable, Any, Dict, TypeVar
 import traceback
 import inspect
 
-from repositories.user_repository import UserRepository
-from core.models.user import User
+from core.config.config import BaseSettingsClass, get_settings, settings
 from core.extensions.database import get_db
 from core.extensions.logger import logger
 from core.extensions.redis import get_redis
-from core.config.config import BaseSettingsClass, get_settings, settings
-from core.security.jwt_service import (
-    get_current_user_payload, get_current_active_user, jwt_handler, JWTHandler
-)
-from core.security.csrf_service import csrf_verify_header, CSRFProtection
-from core.security.email_service import email_manager, EmailManager
-from core.security.session import SessionManager
-from .schemas import TokenPayload
+
+from core.security.jwt_service import JWTService, jwt_service, get_current_user_payload
+from core.security.csrf_service import CSRFProtection, csrf_protection
+from core.security.email_service import EmailManager, email_manager
+from core.security.password_service import PasswordManager, password_manager
+
+from api.v1.schemas import TokenPayload, Tokens, MessageResponse
 
 T = TypeVar('T')
 DecoratedFunc = TypeVar('DecoratedFunc', bound=Callable[..., Any])
@@ -156,19 +154,6 @@ async def check_role(request: Request, allowed_roles: List[str]) -> TokenPayload
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Недостаточно прав для выполнения операции")
     return payload
 
-async def get_current_active_user(
-    payload: TokenPayload = Depends(get_current_user_payload),
-    user_repo: UserRepository = Depends(get_user_repository)
-) -> User:
-    """
-    Получает текущего активного пользователя\n
-    `payload` - Токен пользователя\n
-    `user_repo` - Репозиторий пользователей\n
-    Возвращает пользователя
-    """
-    return await user_repo.get_active_user_by_id(payload.user_id)
-
-
 
 def require_admin_roles(allowed_roles: Optional[List[str]] = None):
     """
@@ -240,25 +225,30 @@ def require_authenticated():
     return decorator
 
 __all__ = [
-    "get_db",
-    "get_redis",
+    "BaseSettingsClass",
     "get_settings",
     "settings",
-    "BaseSettingsClass",
+    "get_db",
     "logger",
-    "jwt_handler",
-    "JWTHandler",
-    "email_manager",
-    "EmailManager",
+    "get_redis",
+    "JWTService",
+    "jwt_service",
+    "get_current_user_payload",
     "CSRFProtection",
-    "SessionManager",
-    "csrf_verify_header",
+    "csrf_protection",
+    "EmailManager",
+    "email_manager",
+    "PasswordManager",
+    "password_manager",
+    "TokenPayload",
+    "Tokens",
+    "MessageResponse",
+    "handle_exception",
     "get_access_token_from_request",
     "get_refresh_token_from_request",
-    "get_current_user_payload",
-    "get_current_active_user",
+    "extract_request",
+    "check_role",
     "require_admin_roles",
     "require_not_guest",
     "require_authenticated",
-    "handle_exception"
 ]

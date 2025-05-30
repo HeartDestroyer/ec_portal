@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from api.v1.auth.auth_routes import auth_router
 from api.v1.cache.routes import cache_router
-from api.v1.session.routes import session_router
+from backend.api.v1.session.session_routes import session_router
 from api.v1.user.routes import user_router
 from api.v1.telegram.routes import telegram_router
 from api.v1.notifications.routes import notifications_router

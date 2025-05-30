@@ -1,4 +1,5 @@
-from core.extensions.logger import logger
+# backend/api/v1/session/utils.py - Получение информации о браузере, устройстве и геолокации
+
 from typing import  Optional
 from fastapi import Request
 import aiohttp
@@ -11,9 +12,9 @@ class SessionUtils:
     Класс для работы с сессиями пользователей
 
     Методы:
-        - `parse_user_agent` - Метод для парсинга `User-Agent` для получения информации о браузере и устройстве (без поля location, ip_address)\n
-        - `get_client_ip` - Метод для получения IP-адреса клиента\n
-        - `get_location_by_ip` - Метод для получения геолокации по IP-адресу\n
+        - `parse_user_agent` - Метод для парсинга `User-Agent` для получения информации о браузере и устройстве (без поля location, ip_address)
+        - `get_client_ip` - Метод для получения IP-адреса клиента
+        - `get_location_by_ip` - Метод для получения геолокации по IP-адресу
         - `user_agent_info` - Метод для парсинга User-Agent для получения информации о браузере, устройстве и геолокации
     """
 
